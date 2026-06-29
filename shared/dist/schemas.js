@@ -1,0 +1,19 @@
+import { z } from 'zod';
+import { PROSPECT_STATUSES, UNIT_STATUSES } from './types.js';
+export const CreateUnitSchema = z.object({
+    number: z.string().min(1, 'Unit number is required'),
+    status: z.enum(UNIT_STATUSES).default('available'),
+    rent: z.number().positive('Rent must be a positive number'),
+    bedrooms: z.number().int().nonnegative('Bedrooms must be non-negative'),
+    bathrooms: z.number().nonnegative('Bathrooms must be non-negative')
+});
+export const UpdateUnitSchema = CreateUnitSchema.partial();
+export const CreateProspectSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Invalid email address'),
+    phone: z.string().min(1, 'Phone number is required'),
+    status: z.enum(PROSPECT_STATUSES).default('new'),
+    notes: z.string().default(''),
+    assignedUnitId: z.string().nullable().optional()
+});
+export const UpdateProspectSchema = CreateProspectSchema.partial();

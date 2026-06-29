@@ -1,0 +1,379 @@
+import { useState, useEffect } from 'react';
+import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput } from 'shared';
+import {
+  fetchUnits,
+  createUnit,
+  deleteUnit,
+  fetchProspects,
+  createProspect,
+  updateProspect,
+  deleteProspect
+} from './api.js';
+import { KanbanBoard } from './components/KanbanBoard.js';
+import { TableView } from './components/TableView.js';
+import { DetailDrawer } from './components/DetailDrawer.js';
+import { UnitManager } from './components/UnitManager.js';
+import { ProspectModal } from './components/ProspectModal.js';
+import {
+  Home,
+  Users,
+  Grid,
+  List,
+  Plus,
+  TrendingUp,
+  FileCheck,
+  Building,
+  Activity,
+  Loader2,
+  RefreshCw
+} from 'lucide-react';
+
+function App() {
+  const [activeTab, setActiveTab] = useState<'prospects' | 'units'>('prospects');
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
+  
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  
+  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [fetchedProspects, fetchedUnits] = await Promise.all([
+        fetchProspects(),
+        fetchUnits()
+      ]);
+      setProspects(fetchedProspects);
+      setUnits(fetchedUnits);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load database records');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleCreateProspect = async (data: CreateProspectInput) => {
+    try {
+      await createProspect(data);
+      await loadData();
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to create prospect');
+    }
+  };
+
+  const handleUpdateProspect = async (id: string, data: any) => {
+    try {
+      const updated = await updateProspect(id, data);
+      await loadData();
+      
+      // Update selected prospect in case the drawer is still open
+      if (selectedProspect && selectedProspect.id === id) {
+        setSelectedProspect(updated);
+      }
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to update prospect');
+    }
+  };
+
+  const handleDeleteProspect = async (id: string) => {
+    try {
+      await deleteProspect(id);
+      await loadData();
+      if (selectedProspect && selectedProspect.id === id) {
+        setSelectedProspect(null);
+        setIsDrawerOpen(false);
+      }
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to delete prospect');
+    }
+  };
+
+  const handleQuickStatusChange = async (id: string, newStatus: ProspectStatus) => {
+    try {
+      await updateProspect(id, { status: newStatus });
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update status');
+    }
+  };
+
+  const handleCreateUnit = async (data: CreateUnitInput) => {
+    try {
+      await createUnit(data);
+      await loadData();
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to create apartment unit');
+    }
+  };
+
+  const handleDeleteUnit = async (id: string) => {
+    if (confirm('Are you sure you want to delete this unit? This will unassign any connected prospects.')) {
+      try {
+        await deleteUnit(id);
+        await loadData();
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete unit');
+      }
+    }
+  };
+
+  const handleSelectProspect = (prospect: Prospect) => {
+    setSelectedProspect(prospect);
+    setIsDrawerOpen(true);
+  };
+
+  // Compute metrics
+  const totalLeads = prospects.length;
+  const applicationCount = prospects.filter((p) => p.status === 'application').length;
+  const leasedCount = prospects.filter((p) => p.status === 'leased').length;
+  
+  const totalUnits = units.length;
+  const occupiedUnits = units.filter((u) => u.status === 'leased').length;
+  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+      {/* Top Premium Navigation Header */}
+      <header className="border-b border-slate-900 bg-slate-900/35 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-brand-500/20 active-glow">
+              <Building size={18} className="text-white" />
+            </div>
+            <div>
+              <span className="font-extrabold text-sm tracking-wide text-slate-100 uppercase">
+                Aura Living
+              </span>
+              <span className="text-[10px] block font-semibold text-brand-400 uppercase tracking-widest leading-none">
+                Leasing CRM
+              </span>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <nav className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-0.5">
+            <button
+              onClick={() => setActiveTab('prospects')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                activeTab === 'prospects'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-800/80'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Users size={14} />
+              Prospect Pipeline
+            </button>
+            <button
+              onClick={() => setActiveTab('units')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                activeTab === 'units'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-800/80'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Home size={14} />
+              Units Directory
+            </button>
+          </nav>
+
+          {/* Refresh Button */}
+          <button
+            onClick={loadData}
+            disabled={isLoading}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            title="Sync Database"
+          >
+            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+            <span>Sync</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+        {/* KPI Dashboard Metrics Cards */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Metric 1 */}
+          <div className="glass-panel border border-slate-800/80 rounded-2xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <Users size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Total Leads
+              </span>
+              <span className="text-xl font-bold text-slate-100">{totalLeads}</span>
+            </div>
+          </div>
+
+          {/* Metric 2 */}
+          <div className="glass-panel border border-slate-800/80 rounded-2xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-pink-500/10 text-pink-400 border border-pink-500/20">
+              <FileCheck size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Applications
+              </span>
+              <span className="text-xl font-bold text-slate-100">{applicationCount}</span>
+            </div>
+          </div>
+
+          {/* Metric 3 */}
+          <div className="glass-panel border border-slate-800/80 rounded-2xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Leases Signed
+              </span>
+              <span className="text-xl font-bold text-slate-100">{leasedCount}</span>
+            </div>
+          </div>
+
+          {/* Metric 4 */}
+          <div className="glass-panel border border-slate-800/80 rounded-2xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              <Building size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Occupancy Rate
+              </span>
+              <span className="text-xl font-bold text-slate-100">{occupancyRate}%</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Dynamic Panels */}
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-24">
+            <Loader2 className="animate-spin text-brand-500 mb-3" size={32} />
+            <p className="text-sm text-slate-400 font-medium">Fetching apartment files...</p>
+          </div>
+        ) : error ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-rose-500/20 bg-rose-500/5 rounded-2xl py-12">
+            <Activity className="text-rose-500 mb-3" size={32} />
+            <h3 className="font-bold text-slate-200">Database connection failed</h3>
+            <p className="text-sm text-slate-500 mt-1 max-w-md">{error}</p>
+            <button
+              onClick={loadData}
+              className="mt-4 px-4 py-2 bg-slate-900 border border-slate-850 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition-colors"
+            >
+              Attempt Reconnect
+            </button>
+          </div>
+        ) : activeTab === 'prospects' ? (
+          <div className="flex-1 flex flex-col gap-4">
+            {/* Prospects Dashboard Header Toolbar */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Prospect Directory</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Track and move prospective tenants through the leasing steps.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* View Switcher (Kanban vs Table) */}
+                <div className="flex items-center bg-slate-950 border border-slate-850 rounded-xl p-0.5">
+                  <button
+                    onClick={() => setViewMode('kanban')}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      viewMode === 'kanban' ? 'bg-slate-900 text-brand-400' : 'text-slate-500'
+                    }`}
+                    title="Pipeline Board"
+                  >
+                    <Grid size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      viewMode === 'table' ? 'bg-slate-900 text-brand-400' : 'text-slate-500'
+                    }`}
+                    title="Spreadsheet List"
+                  >
+                    <List size={14} />
+                  </button>
+                </div>
+
+                {/* Add Prospect Action */}
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-lg shadow-brand-500/10 active:scale-[0.98] transition-all"
+                >
+                  <Plus size={14} />
+                  Add Prospect
+                </button>
+              </div>
+            </div>
+
+            {/* Render Kanban or Table */}
+            <div className="flex-1 min-h-0">
+              {viewMode === 'kanban' ? (
+                <KanbanBoard
+                  prospects={prospects}
+                  onSelectProspect={handleSelectProspect}
+                  onUpdateStatus={handleQuickStatusChange}
+                />
+              ) : (
+                <TableView prospects={prospects} onSelectProspect={handleSelectProspect} />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-100">Property Unit Directory</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage residential physical assets, availability status, and lease relationships.
+              </p>
+            </div>
+
+            {/* Render Unit Manager */}
+            <UnitManager
+              units={units}
+              onCreateUnit={handleCreateUnit}
+              onDeleteUnit={handleDeleteUnit}
+            />
+          </div>
+        )}
+      </main>
+
+      {/* sliding drawer panel for details */}
+      <DetailDrawer
+        prospect={selectedProspect}
+        units={units}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedProspect(null);
+        }}
+        onUpdate={handleUpdateProspect}
+        onDelete={handleDeleteProspect}
+      />
+
+      {/* modal window for creating prospect */}
+      <ProspectModal
+        units={units}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreateProspect={handleCreateProspect}
+      />
+    </div>
+  );
+}
+
+export default App;
