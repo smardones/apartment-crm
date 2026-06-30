@@ -39,8 +39,11 @@ export interface Prospect {
   notes: string;
   assignedUnitId: string | null;
   assignedUnit?: Unit | null;
+  tourDate: string | null;
   createdAt: string;
   updatedAt: string;
+  tasks?: Task[];
+  statusHistory?: StatusHistory[];
 }
 
 export interface ActivityEvent {
@@ -63,8 +66,18 @@ export interface Tour {
 export interface Task {
   id: string;
   title: string;
-  dueDate: Date;
-  assignee: string;
-  prospect: string;
-  state: "open" | "done"
+  description: string | null;
+  dueDate: string;
+  isCompleted: boolean;
+  completedAt: string | null;
+  prospectId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StatusHistory {
+  id: string;
+  status: ProspectStatus;
+  prospectId: string;
+  createdAt: string;
 }

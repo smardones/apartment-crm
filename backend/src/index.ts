@@ -5,8 +5,10 @@ import {
   CreateProspectSchema,
   UpdateProspectSchema,
   CreateUnitSchema,
-  UpdateUnitSchema
+  UpdateUnitSchema,
+  UpdateTaskSchema
 } from 'shared';
+import { AutomationService } from './automationService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -111,7 +113,9 @@ app.get('/api/prospects', async (req: Request, res: Response) => {
   try {
     const prospects = await prisma.prospect.findMany({
       include: {
-        assignedUnit: true
+        assignedUnit: true,
+        tasks: { orderBy: { dueDate: 'asc' } },
+        statusHistory: { orderBy: { createdAt: 'desc' } }
       },
       orderBy: {
         updatedAt: 'desc'
@@ -129,7 +133,11 @@ app.get('/api/prospects/:id', async (req: Request, res: Response) => {
   try {
     const prospect = await prisma.prospect.findUnique({
       where: { id },
-      include: { assignedUnit: true }
+      include: {
+        assignedUnit: true,
+        tasks: { orderBy: { dueDate: 'asc' } },
+        statusHistory: { orderBy: { createdAt: 'desc' } }
+      }
     });
     if (!prospect) {
       res.status(404).json({ error: 'Prospect not found' });
@@ -218,7 +226,7 @@ app.put('/api/prospects/:id', async (req: Request, res: Response) => {
     }
 
     const dataToUpdate = { ...parsed.data };
-    
+
     // Explicitly handle assignedUnitId mapping
     if (dataToUpdate.assignedUnitId === undefined) {
       // keep existing
@@ -281,7 +289,27 @@ app.put('/api/prospects/:id', async (req: Request, res: Response) => {
       }
     }
 
-    res.json(prospect);
+    // Handle task automation if status changed
+    if (existing.status !== prospect.status) {
+      await AutomationService.handleStatusChange(
+        prospect.id,
+        existing.status,
+        prospect.status as any,
+        prospect as any
+      );
+    }
+
+    // Re-fetch the prospect to include any newly created tasks or history records
+    const updatedProspect = await prisma.prospect.findUnique({
+      where: { id },
+      include: {
+        assignedUnit: true,
+        tasks: { orderBy: { dueDate: 'asc' } },
+        statusHistory: { orderBy: { createdAt: 'desc' } }
+      }
+    });
+
+    res.json(updatedProspect);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to update prospect', details: error.message });
   }
@@ -293,7 +321,7 @@ app.delete('/api/prospects/:id', async (req: Request, res: Response) => {
   try {
     const existing = await prisma.prospect.findUnique({ where: { id } });
     await prisma.prospect.delete({ where: { id } });
-    
+
     // Revert unit status if it has no other active prospects
     if (existing && existing.assignedUnitId) {
       const activeProspectsOnUnit = await prisma.prospect.count({
@@ -313,6 +341,57 @@ app.delete('/api/prospects/:id', async (req: Request, res: Response) => {
     res.status(204).send();
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to delete prospect', details: error.message });
+  }
+});
+
+
+// --- TASKS ROUTES ---
+
+// Get all tasks
+app.get('/api/tasks', async (req: Request, res: Response) => {
+  try {
+    const tasks = await prisma.task.findMany({
+      include: {
+        prospect: {
+          select: { name: true }
+        }
+      },
+      orderBy: {
+        dueDate: 'asc'
+      }
+    });
+    res.json(tasks);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve tasks', details: error.message });
+  }
+});
+
+// Update a task
+app.put('/api/tasks/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const parsed = UpdateTaskSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsed.error.format() });
+      return;
+    }
+
+    const dataToUpdate: any = { ...parsed.data };
+
+    // Automatically set completedAt if marked completed
+    if (dataToUpdate.isCompleted && !dataToUpdate.completedAt) {
+      dataToUpdate.completedAt = new Date();
+    } else if (dataToUpdate.isCompleted === false) {
+      dataToUpdate.completedAt = null;
+    }
+
+    const task = await prisma.task.update({
+      where: { id },
+      data: dataToUpdate
+    });
+    res.json(task);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update task', details: error.message });
   }
 });
 

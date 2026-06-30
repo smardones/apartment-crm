@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { prisma } from './db.js';
-import { CreateProspectSchema, UpdateProspectSchema, CreateUnitSchema, UpdateUnitSchema } from 'shared';
+import { CreateProspectSchema, UpdateProspectSchema, CreateUnitSchema, UpdateUnitSchema, UpdateTaskSchema } from 'shared';
+import { AutomationService } from './automationService.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 app.use(cors());
@@ -254,6 +255,10 @@ app.put('/api/prospects/:id', async (req, res) => {
                 });
             }
         }
+        // Handle task automation if status changed
+        if (existing.status !== prospect.status) {
+            await AutomationService.handleStatusChange(prospect.id, existing.status, prospect.status, prospect);
+        }
         res.json(prospect);
     }
     catch (error) {
@@ -285,6 +290,53 @@ app.delete('/api/prospects/:id', async (req, res) => {
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to delete prospect', details: error.message });
+    }
+});
+// --- TASKS ROUTES ---
+// Get all tasks
+app.get('/api/tasks', async (req, res) => {
+    try {
+        const tasks = await prisma.task.findMany({
+            include: {
+                prospect: {
+                    select: { name: true }
+                }
+            },
+            orderBy: {
+                dueDate: 'asc'
+            }
+        });
+        res.json(tasks);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve tasks', details: error.message });
+    }
+});
+// Update a task
+app.put('/api/tasks/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const parsed = UpdateTaskSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: 'Validation failed', details: parsed.error.format() });
+            return;
+        }
+        const dataToUpdate = { ...parsed.data };
+        // Automatically set completedAt if marked completed
+        if (dataToUpdate.isCompleted && !dataToUpdate.completedAt) {
+            dataToUpdate.completedAt = new Date();
+        }
+        else if (dataToUpdate.isCompleted === false) {
+            dataToUpdate.completedAt = null;
+        }
+        const task = await prisma.task.update({
+            where: { id },
+            data: dataToUpdate
+        });
+        res.json(task);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update task', details: error.message });
     }
 });
 app.listen(PORT, () => {

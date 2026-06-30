@@ -4,7 +4,9 @@ import {
   CreateUnitInput,
   UpdateUnitInput,
   CreateProspectInput,
-  UpdateProspectInput
+  UpdateProspectInput,
+  Task,
+  UpdateTaskInput
 } from 'shared';
 
 const API_BASE = '/api';
@@ -89,4 +91,18 @@ export async function deleteProspect(id: string): Promise<void> {
     method: 'DELETE'
   });
   await handleResponse(res);
+}
+
+export async function fetchTasks(): Promise<Task[]> {
+  const res = await fetch(`${API_BASE}/tasks`);
+  return handleResponse(res);
+}
+
+export async function updateTask(id: string, data: UpdateTaskInput): Promise<Task> {
+  const res = await fetch(`${API_BASE}/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
 }

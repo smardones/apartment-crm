@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Prospect, ProspectStatus, Unit } from 'shared';
+import { Prospect, ProspectStatus, StatusHistory, Unit } from 'shared';
 import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2 } from 'lucide-react';
 
 interface DetailDrawerProps {
@@ -9,6 +9,7 @@ interface DetailDrawerProps {
   onClose: () => void;
   onUpdate: (id: string, updatedData: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onUpdateTask: (id: string, isCompleted: boolean) => Promise<void>;
 }
 
 const statusSteps: { value: ProspectStatus; label: string }[] = [
@@ -27,21 +28,24 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   isOpen,
   onClose,
   onUpdate,
-  onDelete
+  onDelete,
+  onUpdateTask
 }) => {
+  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'history'>('info');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<ProspectStatus>('new');
   const [notes, setNotes] = useState('');
   const [assignedUnitId, setAssignedUnitId] = useState<string>('');
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Sync form states with prospect prop
   useEffect(() => {
+    console.log({ prospect })
     if (prospect) {
       setName(prospect.name);
       setEmail(prospect.email);
@@ -127,7 +131,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
               Pipeline Stage Progress
             </h3>
-            
+
             <div className="relative flex items-center justify-between">
               {/* Stepper track background */}
               <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-800 z-0" />
@@ -143,7 +147,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 const isCompleted = idx < activeIndex;
                 const isActive = idx === activeIndex;
                 const isLost = step.value === 'lost';
-                
+
                 let stepColor = 'bg-slate-800 text-slate-500 border-slate-800';
                 if (isActive) {
                   stepColor = isLost
@@ -166,9 +170,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                       {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
                     </div>
                     <span
-                      className={`text-[10px] font-semibold tracking-tight transition-colors ${
-                        isActive ? 'text-slate-200' : isCompleted ? 'text-slate-400' : 'text-slate-600'
-                      }`}
+                      className={`text-[10px] font-semibold tracking-tight transition-colors ${isActive ? 'text-slate-200' : isCompleted ? 'text-slate-400' : 'text-slate-600'
+                        }`}
                     >
                       {step.label}
                     </span>
@@ -178,98 +181,172 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Contact Fields Section */}
-          <div className="flex flex-col gap-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Prospect Details
-            </h3>
-
-            {/* Name */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-slate-400 font-medium">Name</label>
-              <div className="relative">
-                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-slate-400 font-medium">Email</label>
-              <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-slate-400 font-medium">Phone</label>
-              <div className="relative">
-                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="text"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
-                />
-              </div>
-            </div>
+          <div className="flex items-center gap-4 border-b border-slate-800 pb-2 mb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('info')}
+              className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${activeTab === 'info' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+            >
+              Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tasks')}
+              className={`text-sm font-semibold pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tasks' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+            >
+              Tasks
+              {prospect.tasks && prospect.tasks.filter(t => !t.isCompleted).length > 0 && (
+                <span className="bg-brand-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{prospect.tasks.filter(t => !t.isCompleted).length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${activeTab === 'history' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+            >
+              History
+            </button>
           </div>
 
-          {/* Unit Assignment */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-slate-400 font-medium">Assigned Apartment Unit</label>
-              {prospect.assignedUnit && (
-                <span className="text-[10px] text-slate-500">
-                  Rent: ${prospect.assignedUnit.rent}/mo
-                </span>
+          {activeTab === 'info' && (
+            <>
+              {/* Contact Fields Section */}
+              <div className="flex flex-col gap-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Prospect Details
+                </h3>
+
+                {/* Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Name</label>
+                  <div className="relative">
+                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Email</label>
+                  <div className="relative">
+                    <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Phone</label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Unit Assignment */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-slate-400 font-medium">Assigned Apartment Unit</label>
+                  {prospect.assignedUnit && (
+                    <span className="text-[10px] text-slate-500">
+                      Rent: ${prospect.assignedUnit.rent}/mo
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <select
+                    value={assignedUnitId}
+                    onChange={(e) => setAssignedUnitId(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="">Unassigned / No Unit Chosen</option>
+                    {eligibleUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        Unit {u.number} ({u.bedrooms} Bed / {u.bathrooms} Bath) — {u.status.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="flex flex-col gap-1.5 flex-1 min-h-[120px]">
+                <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <FileText size={14} className="text-slate-500" />
+                  Leasing Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Record inquiry details, tour reactions, screening progress or follow-up timelines..."
+                  className="w-full flex-1 p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm resize-none"
+                />
+              </div>
+            </>)}
+
+          {activeTab === 'tasks' && (
+            <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+              {!prospect.tasks || prospect.tasks.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">No tasks for this prospect.</div>
+              ) : (
+                prospect.tasks.map((task: any) => (
+                  <div key={task.id} className={`p-3 rounded-xl border flex items-start gap-3 transition-colors ${task.isCompleted ? 'bg-slate-950/50 border-slate-800/50 opacity-50' : 'bg-slate-950 border-slate-800'}`}>
+                    <input
+                      type="checkbox"
+                      checked={task.isCompleted}
+                      onChange={(e) => onUpdateTask(task.id, e.target.checked)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${task.isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}>{task.title}</p>
+                      {task.description && <p className="text-xs text-slate-500 mt-1">{task.description}</p>}
+                      <div className="text-xs font-medium text-slate-500 mt-2">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-            <div className="relative">
-              <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <select
-                value={assignedUnitId}
-                onChange={(e) => setAssignedUnitId(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
-              >
-                <option value="">Unassigned / No Unit Chosen</option>
-                {eligibleUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    Unit {u.number} ({u.bedrooms} Bed / {u.bathrooms} Bath) — {u.status.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
 
-          {/* Notes */}
-          <div className="flex flex-col gap-1.5 flex-1 min-h-[120px]">
-            <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-              <FileText size={14} className="text-slate-500" />
-              Leasing Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Record inquiry details, tour reactions, screening progress or follow-up timelines..."
-              className="w-full flex-1 p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm resize-none"
-            />
-          </div>
+          {activeTab === 'history' && (
+            <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto">
+              <div className="relative border-l border-slate-800 ml-3 pl-4 space-y-6">
+                {!prospect.statusHistory || prospect.statusHistory.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 text-sm -ml-7">No history recorded.</div>
+                ) : (
+                  prospect.statusHistory.map((hist: StatusHistory, i: number) => (
+                    <div key={hist.id + i} className="relative">
+                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-brand-500 border-2 border-slate-900" />
+                      <p className="text-sm font-semibold text-slate-200">
+                        Status changed to <span className="uppercase text-brand-400">{hist.status}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">{new Date(hist.createdAt).toLocaleString()}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Footer Actions */}

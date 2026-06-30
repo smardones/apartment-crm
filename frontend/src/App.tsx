@@ -7,7 +7,9 @@ import {
   fetchProspects,
   createProspect,
   updateProspect,
-  deleteProspect
+  deleteProspect,
+  fetchTasks,
+  updateTask
 } from './api.js';
 import { KanbanBoard } from './components/KanbanBoard.js';
 import { TableView } from './components/TableView.js';
@@ -25,8 +27,10 @@ import {
   Building,
   Activity,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
+import { GlobalSidebar } from './components/GlobalSidebar.js';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'prospects' | 'units'>('prospects');
@@ -34,6 +38,7 @@ function App() {
   
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -46,12 +51,14 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedProspects, fetchedUnits] = await Promise.all([
+      const [fetchedProspects, fetchedUnits, fetchedTasks] = await Promise.all([
         fetchProspects(),
-        fetchUnits()
+        fetchUnits(),
+        fetchTasks()
       ]);
       setProspects(fetchedProspects);
       setUnits(fetchedUnits);
+      setTasks(fetchedTasks);
     } catch (err: any) {
       setError(err.message || 'Failed to load database records');
     } finally {
@@ -108,6 +115,15 @@ function App() {
     }
   };
 
+  const handleUpdateTask = async (id: string, isCompleted: boolean) => {
+    try {
+      await updateTask(id, { isCompleted });
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update task');
+    }
+  };
+
   const handleCreateUnit = async (data: CreateUnitInput) => {
     try {
       await createUnit(data);
@@ -153,7 +169,7 @@ function App() {
             </div>
             <div>
               <span className="font-extrabold text-sm tracking-wide text-slate-100 uppercase">
-                Aura Living
+                Loki Living
               </span>
               <span className="text-[10px] block font-semibold text-brand-400 uppercase tracking-widest leading-none">
                 Leasing CRM
@@ -200,9 +216,16 @@ function App() {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
-        {/* KPI Dashboard Metrics Cards */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Global Sidebar for Tasks */}
+        <GlobalSidebar tasks={tasks} onUpdateTask={handleUpdateTask} onSelectProspect={(id) => {
+           const p = prospects.find(p => p.id === id);
+           if (p) handleSelectProspect(p);
+        }} />
+
+        {/* Main content */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
+          {/* KPI Dashboard Metrics Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Metric 1 */}
           <div className="glass-panel border border-slate-800/80 rounded-2xl p-4 flex items-center gap-4">
@@ -372,6 +395,7 @@ function App() {
         onClose={() => setIsCreateModalOpen(false)}
         onCreateProspect={handleCreateProspect}
       />
+      </div>
     </div>
   );
 }

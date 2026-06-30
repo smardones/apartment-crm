@@ -14,6 +14,17 @@ export const CreateProspectSchema = z.object({
     phone: z.string().min(1, 'Phone number is required'),
     status: z.enum(PROSPECT_STATUSES).default('new'),
     notes: z.string().default(''),
-    assignedUnitId: z.string().nullable().optional()
+    assignedUnitId: z.string().nullable().optional(),
+    tourDate: z.string().nullable().optional()
 });
 export const UpdateProspectSchema = CreateProspectSchema.partial();
+export const CreateTaskSchema = z.object({
+    title: z.string().min(1, 'Title is required'),
+    description: z.string().nullable().optional(),
+    dueDate: z.string(),
+    isCompleted: z.boolean().default(false),
+    prospectId: z.string().min(1, 'Prospect ID is required')
+});
+export const UpdateTaskSchema = CreateTaskSchema.partial().extend({
+    completedAt: z.string().nullable().optional()
+});
