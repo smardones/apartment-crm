@@ -126,7 +126,6 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold text-slate-200">Prospect Profile</h2>
-              <p className="text-xs text-slate-500">ID: {prospect.id.slice(-8).toUpperCase()}</p>
             </div>
           </div>
           <button

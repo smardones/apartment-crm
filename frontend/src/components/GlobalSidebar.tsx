@@ -22,7 +22,7 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
   const openTasks = sortedTasks.filter((t) => !t.isCompleted);
 
   return (
-    <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-full shrink-0">
+    <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
       <div className="p-4 border-b border-slate-800 flex items-center justify-between">
         <h3 className="font-bold text-slate-100 flex items-center gap-2">
           <CheckCircle2 size={18} className="text-brand-400" />
