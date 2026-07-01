@@ -15,6 +15,7 @@ model Unit {
   bedrooms  Int
   bathrooms Float
   prospects Prospect[]
+  tours     Tour[]
 }
 
 model Prospect {
@@ -31,6 +32,7 @@ model Prospect {
   updatedAt      DateTime @updatedAt
   tasks          Task[]
   statusHistory  StatusHistory[]
+  tours          Tour[]
 }
 
 model Task {
@@ -52,4 +54,17 @@ model StatusHistory {
   prospectId String
   prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+}
+
+model Tour {
+  id            String    @id @default(cuid())
+  prospectId    String
+  prospect      Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  unitId        String?
+  unit          Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  scheduledTime DateTime
+  status        String    // "scheduled", "canceled", "completed", "no_show"
+  outcome       String?   // "no_show", "completed_next_steps", "completed_follow_up", "completed_not_interested"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

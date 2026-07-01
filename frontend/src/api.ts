@@ -6,7 +6,10 @@ import {
   CreateProspectInput,
   UpdateProspectInput,
   Task,
-  UpdateTaskInput
+  UpdateTaskInput,
+  Tour,
+  CreateTourInput,
+  UpdateTourInput
 } from 'shared';
 
 const API_BASE = '/api';
@@ -103,6 +106,38 @@ export async function updateTask(id: string, data: UpdateTaskInput): Promise<Tas
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+export async function fetchTours(): Promise<Tour[]> {
+  const res = await fetch(`${API_BASE}/tours`);
+  return handleResponse(res);
+}
+
+export async function createTour(data: CreateTourInput): Promise<Tour> {
+  const res = await fetch(`${API_BASE}/tours`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+export async function updateTour(id: string, data: UpdateTourInput): Promise<Tour> {
+  const res = await fetch(`${API_BASE}/tours/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+export async function recordTourOutcome(id: string, outcome: string): Promise<Tour> {
+  const res = await fetch(`${API_BASE}/tours/${id}/outcome`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ outcome })
   });
   return handleResponse(res);
 }

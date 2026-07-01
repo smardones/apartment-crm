@@ -24,7 +24,7 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [status, setStatus] = useState<any>('available');
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -234,7 +234,6 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
                   </div>
                 </div>
 
-                {/* Card Action footer */}
                 <div className="pt-3 border-t border-slate-850 flex justify-end">
                   <button
                     onClick={() => onDeleteUnit(unit.id)}

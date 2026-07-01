@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Prospect, ProspectStatus, StatusHistory, Unit } from 'shared';
-import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2 } from 'lucide-react';
+import { Prospect, ProspectStatus, StatusHistory, Unit, Tour } from 'shared';
+import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2, Plus, Clock, Building } from 'lucide-react';
 
 interface DetailDrawerProps {
   prospect: Prospect | null;
@@ -10,6 +10,7 @@ interface DetailDrawerProps {
   onUpdate: (id: string, updatedData: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onUpdateTask: (id: string, isCompleted: boolean) => Promise<void>;
+  onScheduleTour?: (prospect: Prospect) => void;
 }
 
 const statusSteps: { value: ProspectStatus; label: string }[] = [
@@ -29,9 +30,10 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   onClose,
   onUpdate,
   onDelete,
-  onUpdateTask
+  onUpdateTask,
+  onScheduleTour
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'history'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'history' | 'tours'>('info');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -206,6 +208,16 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             >
               History
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tours')}
+              className={`text-sm font-semibold pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tours' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+            >
+              Tours
+              {prospect.tours && prospect.tours.filter(t => t.status === 'scheduled').length > 0 && (
+                <span className="bg-brand-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{prospect.tours.filter(t => t.status === 'scheduled').length}</span>
+              )}
+            </button>
           </div>
 
           {activeTab === 'info' && (
@@ -343,6 +355,73 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                       <p className="text-xs text-slate-500 mt-1">{new Date(hist.createdAt).toLocaleString()}</p>
                     </div>
                   ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'tours' && (
+            <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Scheduled Tours
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => onScheduleTour && onScheduleTour(prospect)}
+                  className="px-3 py-1 rounded-lg bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 text-brand-400 font-semibold text-[11px] transition-all flex items-center gap-1"
+                >
+                  <Plus size={10} />
+                  Book Tour
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {!prospect.tours || prospect.tours.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 text-sm">No tours scheduled for this prospect.</div>
+                ) : (
+                  prospect.tours.map((tour: Tour) => {
+                    const tourDate = new Date(tour.scheduledTime);
+                    const isCanceled = tour.status === 'canceled';
+                    const isCompleted = tour.status === 'completed' || tour.status === 'no_show';
+                    
+                    let badgeColor = 'bg-slate-950 text-slate-400 border-slate-800';
+                    if (isCanceled) {
+                      badgeColor = 'bg-rose-950/20 text-rose-400 border-rose-500/20 line-through';
+                    } else if (isCompleted) {
+                      badgeColor = 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20';
+                    } else if (tourDate < new Date()) {
+                      badgeColor = 'bg-amber-950/40 text-amber-400 border-amber-500/20';
+                    } else {
+                      badgeColor = 'bg-brand-500/10 text-brand-400 border-brand-500/20';
+                    }
+
+                    return (
+                      <div key={tour.id} className="p-3.5 rounded-xl border flex flex-col gap-2 bg-slate-950 border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider border px-2 py-0.5 rounded ${badgeColor}`}>
+                            {tour.status.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs text-slate-400 font-semibold flex items-center gap-1">
+                            <Clock size={12} />
+                            {tourDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
+                          <Building size={14} className="text-slate-500" />
+                          <span>Unit: {tour.unit ? `Unit ${tour.unit.number}` : <span className="text-rose-400 font-bold">Unassigned (Required)</span>}</span>
+                        </div>
+
+                        {tour.outcome && (
+                          <div className="mt-1 text-[11px] text-slate-400 font-medium p-2 bg-slate-900 border border-slate-850 rounded-lg flex items-center gap-1.5">
+                            <CheckCircle2 size={12} className="text-emerald-400" />
+                            <span>Outcome: <strong className="text-slate-200 capitalize">{tour.outcome.replace(/_/g, ' ')}</strong></span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

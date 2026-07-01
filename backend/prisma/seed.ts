@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Clean database
+  await prisma.tour.deleteMany({});
   await prisma.prospect.deleteMany({});
   await prisma.unit.deleteMany({});
 
@@ -95,7 +96,7 @@ async function main() {
     }
   });
 
-  await prisma.prospect.create({
+  const charlie = await prisma.prospect.create({
     data: {
       name: 'Charlie Brown',
       email: 'charlie.brown@example.com',
@@ -103,6 +104,19 @@ async function main() {
       status: 'tour_scheduled',
       notes: 'Tour scheduled for Wednesday at 2 PM. Showed interest in Unit 101.',
       assignedUnitId: u101.id
+    }
+  });
+
+  const nextWednesday = new Date();
+  nextWednesday.setDate(nextWednesday.getDate() + (3 + 7 - nextWednesday.getDay()) % 7);
+  nextWednesday.setHours(14, 0, 0, 0);
+
+  await prisma.tour.create({
+    data: {
+      prospectId: charlie.id,
+      unitId: u201.id,
+      scheduledTime: nextWednesday,
+      status: 'scheduled'
     }
   });
 

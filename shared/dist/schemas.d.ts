@@ -135,3 +135,41 @@ export declare const UpdateTaskSchema: z.ZodObject<{
 }>;
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
+export declare const CreateTourSchema: z.ZodObject<{
+    prospectId: z.ZodString;
+    unitId: z.ZodString;
+    scheduledTime: z.ZodEffects<z.ZodString, string, string>;
+    status: z.ZodDefault<z.ZodEnum<[string, ...string[]]>>;
+}, "strip", z.ZodTypeAny, {
+    status: string;
+    prospectId: string;
+    unitId: string;
+    scheduledTime: string;
+}, {
+    prospectId: string;
+    unitId: string;
+    scheduledTime: string;
+    status?: string | undefined;
+}>;
+export declare const UpdateTourSchema: z.ZodObject<{
+    prospectId: z.ZodOptional<z.ZodString>;
+    scheduledTime: z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>;
+    status: z.ZodOptional<z.ZodDefault<z.ZodEnum<[string, ...string[]]>>>;
+} & {
+    unitId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    outcome: z.ZodOptional<z.ZodNullable<z.ZodEnum<[string, ...string[]]>>>;
+}, "strip", z.ZodTypeAny, {
+    status?: string | undefined;
+    prospectId?: string | undefined;
+    unitId?: string | null | undefined;
+    scheduledTime?: string | undefined;
+    outcome?: string | null | undefined;
+}, {
+    status?: string | undefined;
+    prospectId?: string | undefined;
+    unitId?: string | null | undefined;
+    scheduledTime?: string | undefined;
+    outcome?: string | null | undefined;
+}>;
+export type CreateTourInput = z.infer<typeof CreateTourSchema>;
+export type UpdateTourInput = z.infer<typeof UpdateTourSchema>;

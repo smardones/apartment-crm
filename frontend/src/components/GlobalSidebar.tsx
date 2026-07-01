@@ -9,8 +9,14 @@ interface GlobalSidebarProps {
 }
 
 export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalSidebarProps) {
-  // Sort tasks by due date
-  const sortedTasks = [...tasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  // Sort tasks: Urgent tasks first, then by due date
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aUrgent = a.title === 'Urgent: Reassign Unit for Tour';
+    const bUrgent = b.title === 'Urgent: Reassign Unit for Tour';
+    if (aUrgent && !bUrgent) return -1;
+    if (!aUrgent && bUrgent) return 1;
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
 
   // Filter for open tasks
   const openTasks = sortedTasks.filter((t) => !t.isCompleted);
@@ -36,25 +42,33 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
           </div>
         ) : (
           openTasks.map((task) => {
+            const isUrgent = task.title === 'Urgent: Reassign Unit for Tour';
             const isOverdue = new Date(task.dueDate) < new Date() && !task.isCompleted;
             return (
               <div
                 key={task.id}
-                className="group relative bg-slate-950 border border-slate-800 rounded-xl p-3 hover:border-slate-700 transition-colors shadow-sm"
+                className={`group relative rounded-xl p-3 border transition-all shadow-sm ${
+                  isUrgent
+                    ? 'bg-rose-500/10 border-rose-500/40 hover:border-rose-500/80 shadow-rose-950/20'
+                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                }`}
               >
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onUpdateTask(task.id, true)}
-                    className="mt-0.5 text-slate-500 hover:text-brand-400 transition-colors"
+                    className={`mt-0.5 transition-colors ${
+                      isUrgent ? 'text-rose-400 hover:text-rose-300' : 'text-slate-500 hover:text-brand-400'
+                    }`}
                   >
                     <Circle size={18} />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 leading-tight">
+                    <p className={`text-sm font-semibold leading-tight flex items-center gap-1.5 ${isUrgent ? 'text-rose-200' : 'text-slate-200'}`}>
+                      {isUrgent && <span className="inline-block text-rose-500 animate-pulse">⚠️</span>}
                       {task.title}
                     </p>
                     {task.description && (
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                      <p className={`text-xs mt-1 line-clamp-2 ${isUrgent ? 'text-rose-300/70' : 'text-slate-500'}`}>
                         {task.description}
                       </p>
                     )}

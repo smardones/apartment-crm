@@ -6,7 +6,9 @@ import {
   UpdateProspectSchema,
   CreateUnitSchema,
   UpdateUnitSchema,
-  UpdateTaskSchema
+  UpdateTaskSchema,
+  CreateTourSchema,
+  UpdateTourSchema
 } from 'shared';
 import { AutomationService } from './automationService.js';
 
@@ -84,10 +86,41 @@ app.put('/api/units/:id', async (req: Request, res: Response) => {
       return;
     }
 
+    const oldUnit = await prisma.unit.findUnique({ where: { id } });
+
     const unit = await prisma.unit.update({
       where: { id },
       data: parsed.data
     });
+
+    // Check if unit is no longer available and create task to reassign another unit to any upcoming tours
+    if (parsed.data.status && (parsed.data.status === 'held' || parsed.data.status === 'leased') && oldUnit?.status === 'available') {
+      const upcomingTours = await prisma.tour.findMany({
+        where: {
+          unitId: id,
+          status: 'scheduled',
+          scheduledTime: { gt: new Date() }
+        }
+      });
+
+      for (const tour of upcomingTours) {
+        await prisma.tour.update({
+          where: { id: tour.id },
+          data: { unitId: null }
+        });
+
+        await prisma.task.create({
+          data: {
+            prospectId: tour.prospectId,
+            title: 'Urgent: Reassign Unit for Tour',
+            description: `The unit formerly assigned to this tour has been held or leased. Please manually assign a new unit.`,
+            dueDate: tour.scheduledTime,
+            isCompleted: false
+          }
+        });
+      }
+    }
+
     res.json(unit);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to update unit', details: error.message });
@@ -115,7 +148,8 @@ app.get('/api/prospects', async (req: Request, res: Response) => {
       include: {
         assignedUnit: true,
         tasks: { orderBy: { dueDate: 'asc' } },
-        statusHistory: { orderBy: { createdAt: 'desc' } }
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+        tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
       },
       orderBy: {
         updatedAt: 'desc'
@@ -136,7 +170,8 @@ app.get('/api/prospects/:id', async (req: Request, res: Response) => {
       include: {
         assignedUnit: true,
         tasks: { orderBy: { dueDate: 'asc' } },
-        statusHistory: { orderBy: { createdAt: 'desc' } }
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+        tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
       }
     });
     if (!prospect) {
@@ -305,7 +340,8 @@ app.put('/api/prospects/:id', async (req: Request, res: Response) => {
       include: {
         assignedUnit: true,
         tasks: { orderBy: { dueDate: 'asc' } },
-        statusHistory: { orderBy: { createdAt: 'desc' } }
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+        tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
       }
     });
 
@@ -392,6 +428,260 @@ app.put('/api/tasks/:id', async (req: Request, res: Response) => {
     res.json(task);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to update task', details: error.message });
+  }
+});
+
+// --- TOURS ROUTES ---
+
+// Get all tours
+app.get('/api/tours', async (req: Request, res: Response) => {
+  try {
+    const tours = await prisma.tour.findMany({
+      include: {
+        prospect: true,
+        unit: true
+      },
+      orderBy: {
+        scheduledTime: 'asc'
+      }
+    });
+    res.json(tours);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve tours', details: error.message });
+  }
+});
+
+// Create a tour
+app.post('/api/tours', async (req: Request, res: Response) => {
+  try {
+    const parsed = CreateTourSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsed.error.format() });
+      return;
+    }
+
+    const { prospectId, unitId, scheduledTime } = parsed.data;
+
+    // Check if unit exists and is available
+    const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    if (!unit) {
+      res.status(400).json({ error: 'Unit not found' });
+      return;
+    }
+    if (unit.status !== 'available') {
+      res.status(400).json({ error: `Unit ${unit.number} is currently ${unit.status} and cannot be toured` });
+      return;
+    }
+
+    const tourStart = new Date(scheduledTime);
+    const tourEnd = new Date(tourStart.getTime() + 60 * 60 * 1000); // 1 hour later
+
+    // Overlap validation for unit
+    const unitOverlap = await prisma.tour.findFirst({
+      where: {
+        unitId,
+        status: 'scheduled',
+        scheduledTime: {
+          gt: new Date(tourStart.getTime() - 60 * 60 * 1000),
+          lt: new Date(tourStart.getTime() + 60 * 60 * 1000)
+        }
+      }
+    });
+    if (unitOverlap) {
+      res.status(400).json({ error: 'This unit is already booked for a tour during this timeslot' });
+      return;
+    }
+
+    // Overlap validation for prospect
+    const prospectOverlap = await prisma.tour.findFirst({
+      where: {
+        prospectId,
+        status: 'scheduled',
+        scheduledTime: {
+          gt: new Date(tourStart.getTime() - 60 * 60 * 1000),
+          lt: new Date(tourStart.getTime() + 60 * 60 * 1000)
+        }
+      }
+    });
+    if (prospectOverlap) {
+      res.status(400).json({ error: 'This prospect is already scheduled for a tour during this timeslot' });
+      return;
+    }
+
+    const tour = await prisma.tour.create({
+      data: {
+        prospectId,
+        unitId,
+        scheduledTime: tourStart,
+        status: 'scheduled'
+      },
+      include: {
+        prospect: true,
+        unit: true
+      }
+    });
+
+    // Update prospect tourDate and unit assignment
+    await prisma.prospect.update({
+      where: { id: prospectId },
+      data: { assignedUnitId: unitId, tourDate: tourStart }
+    });
+
+    // Auto-update prospect status to tour_scheduled if not already, and trigger automation
+    const prospect = await prisma.prospect.findUnique({ where: { id: prospectId } });
+    if (prospect && prospect.status !== 'tour_scheduled') {
+      const updatedProspect = await prisma.prospect.update({
+        where: { id: prospectId },
+        data: { status: 'tour_scheduled' }
+      });
+      await AutomationService.handleStatusChange(
+        prospectId,
+        prospect.status,
+        'tour_scheduled',
+        { ...updatedProspect, tourDate: tourStart }
+      );
+    }
+
+    res.status(201).json(tour);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to create tour', details: error.message });
+  }
+});
+
+// Update/Reschedule/Cancel a tour
+app.put('/api/tours/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const parsed = UpdateTourSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsed.error.format() });
+      return;
+    }
+
+    const existingTour = await prisma.tour.findUnique({ where: { id } });
+    if (!existingTour) {
+      res.status(404).json({ error: 'Tour not found' });
+      return;
+    }
+
+    const { prospectId, unitId, scheduledTime, status } = parsed.data;
+
+    // Handle cancelation quickly
+    if (status === 'canceled' && existingTour.status !== 'canceled') {
+      const updated = await prisma.tour.update({
+        where: { id },
+        data: { status: 'canceled' },
+        include: { prospect: true, unit: true }
+      });
+      // Clear prospect's tourDate and unit assignment
+      await prisma.prospect.update({
+        where: { id: existingTour.prospectId },
+        data: { tourDate: null, assignedUnitId: null }
+      });
+      res.json(updated);
+      return;
+    }
+
+    const targetProspectId = prospectId || existingTour.prospectId;
+    const targetUnitId = unitId !== undefined ? unitId : existingTour.unitId;
+    const targetTime = scheduledTime ? new Date(scheduledTime) : new Date(existingTour.scheduledTime);
+
+    if (targetUnitId) {
+      const unit = await prisma.unit.findUnique({ where: { id: targetUnitId } });
+      if (!unit) {
+        res.status(400).json({ error: 'Unit not found' });
+        return;
+      }
+      if (unit.status !== 'available' && targetUnitId !== existingTour.unitId) {
+        res.status(400).json({ error: `Unit ${unit.number} is currently ${unit.status} and cannot be toured` });
+        return;
+      }
+
+      // Unit overlap validation
+      const unitOverlap = await prisma.tour.findFirst({
+        where: {
+          id: { not: id },
+          unitId: targetUnitId,
+          status: 'scheduled',
+          scheduledTime: {
+            gt: new Date(targetTime.getTime() - 60 * 60 * 1000),
+            lt: new Date(targetTime.getTime() + 60 * 60 * 1000)
+          }
+        }
+      });
+      if (unitOverlap) {
+        res.status(400).json({ error: 'This unit is already booked for a tour during this timeslot' });
+        return;
+      }
+    }
+
+    // Prospect overlap validation
+    const prospectOverlap = await prisma.tour.findFirst({
+      where: {
+        id: { not: id },
+        prospectId: targetProspectId,
+        status: 'scheduled',
+        scheduledTime: {
+          gt: new Date(targetTime.getTime() - 60 * 60 * 1000),
+          lt: new Date(targetTime.getTime() + 60 * 60 * 1000)
+        }
+      }
+    });
+    if (prospectOverlap) {
+      res.status(400).json({ error: 'This prospect is already scheduled for a tour during this timeslot' });
+      return;
+    }
+
+    const updated = await prisma.tour.update({
+      where: { id },
+      data: {
+        prospectId: targetProspectId,
+        unitId: targetUnitId,
+        scheduledTime: targetTime,
+        status: status || existingTour.status
+      },
+      include: {
+        prospect: true,
+        unit: true
+      }
+    });
+
+    // Update prospect assigned unit and tour date in database
+    const prospectUpdateData: any = {};
+    if (unitId !== undefined && unitId !== existingTour.unitId) {
+      prospectUpdateData.assignedUnitId = unitId;
+    }
+    if (scheduledTime) {
+      prospectUpdateData.tourDate = targetTime;
+    }
+    if (Object.keys(prospectUpdateData).length > 0) {
+      await prisma.prospect.update({
+        where: { id: targetProspectId },
+        data: prospectUpdateData
+      });
+    }
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update tour', details: error.message });
+  }
+});
+
+// Record tour outcome
+app.post('/api/tours/:id/outcome', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { outcome } = req.body;
+
+  if (!outcome) {
+    res.status(400).json({ error: 'Outcome is required' });
+    return;
+  }
+
+  try {
+    const updatedTour = await AutomationService.handleTourOutcome(id, outcome);
+    res.json(updatedTour);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to record outcome', details: error.message });
   }
 });
 

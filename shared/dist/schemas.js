@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PROSPECT_STATUSES, UNIT_STATUSES } from './types.js';
+import { PROSPECT_STATUSES, UNIT_STATUSES, TOUR_STATUSES, TOUR_OUTCOMES } from './types.js';
 export const CreateUnitSchema = z.object({
     number: z.string().min(1, 'Unit number is required'),
     status: z.enum(UNIT_STATUSES).default('available'),
@@ -27,4 +27,14 @@ export const CreateTaskSchema = z.object({
 });
 export const UpdateTaskSchema = CreateTaskSchema.partial().extend({
     completedAt: z.string().nullable().optional()
+});
+export const CreateTourSchema = z.object({
+    prospectId: z.string().min(1, 'Prospect ID is required'),
+    unitId: z.string().min(1, 'Unit ID is required'),
+    scheduledTime: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Invalid date/time format' }),
+    status: z.enum(TOUR_STATUSES).default('scheduled')
+});
+export const UpdateTourSchema = CreateTourSchema.partial().extend({
+    unitId: z.string().nullable().optional(),
+    outcome: z.enum(TOUR_OUTCOMES).nullable().optional()
 });

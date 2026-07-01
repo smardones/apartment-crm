@@ -54,6 +54,14 @@ export const automationRules: AutomationRule[] = [
   }
 ];
 
+export const TOUR_OUTCOME_TO_PROSPECT_STATUS: Record<string, ProspectStatus> = {
+  no_show: 'lost',
+  completed_next_steps: 'application',
+  completed_follow_up: 'toured',
+  completed_not_interested: 'lost'
+};
+
+
 export class AutomationService {
   static async handleStatusChange(prospectId: string, oldStatus: string, newStatus: ProspectStatus, prospectData: Prospect) {
     if (oldStatus === newStatus) return;
@@ -120,5 +128,42 @@ export class AutomationService {
         }
       }
     }
+  }
+
+  static async handleTourOutcome(tourId: string, outcome: string) {
+    let finalStatus = 'completed';
+    if (outcome === 'no_show') {
+      finalStatus = 'no_show';
+    }
+
+    const updatedTour = await prisma.tour.update({
+      where: { id: tourId },
+      data: {
+        status: finalStatus,
+        outcome
+      },
+      include: {
+        prospect: true,
+        unit: true
+      }
+    });
+
+    const newProspectStatus = TOUR_OUTCOME_TO_PROSPECT_STATUS[outcome] || null;
+
+    if (newProspectStatus && updatedTour.prospect.status !== newProspectStatus) {
+      const oldStatus = updatedTour.prospect.status;
+      const updatedProspect = await prisma.prospect.update({
+        where: { id: updatedTour.prospectId },
+        data: { status: newProspectStatus }
+      });
+      await this.handleStatusChange(
+        updatedTour.prospectId,
+        oldStatus,
+        newProspectStatus,
+        updatedProspect as any
+      );
+    }
+
+    return updatedTour;
   }
 }

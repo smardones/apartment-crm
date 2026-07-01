@@ -24,6 +24,7 @@ export interface Prospect {
     updatedAt: string;
     tasks?: Task[];
     statusHistory?: StatusHistory[];
+    tours?: Tour[];
 }
 export interface ActivityEvent {
     id: string;
@@ -33,12 +34,21 @@ export interface ActivityEvent {
     prospect: string;
     summary: string[];
 }
+export type TourStatus = 'scheduled' | 'canceled' | 'completed' | 'no_show';
+export declare const TOUR_STATUSES: TourStatus[];
+export type TourOutcome = 'no_show' | 'completed_next_steps' | 'completed_follow_up' | 'completed_not_interested';
+export declare const TOUR_OUTCOMES: TourOutcome[];
 export interface Tour {
     id: string;
-    prospect: string;
-    unit: string;
-    scheduledTime: Date;
-    outcome?: string | null;
+    prospectId: string;
+    prospect?: Prospect;
+    unitId: string | null;
+    unit?: Unit | null;
+    scheduledTime: string;
+    status: TourStatus;
+    outcome: TourOutcome | null;
+    createdAt: string;
+    updatedAt: string;
 }
 export interface Task {
     id: string;

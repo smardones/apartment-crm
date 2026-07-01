@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput } from 'shared';
+import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput, Tour, Task } from 'shared';
 import {
   fetchUnits,
   createUnit,
@@ -9,8 +9,10 @@ import {
   updateProspect,
   deleteProspect,
   fetchTasks,
-  updateTask
+  updateTask,
+  fetchTours
 } from './api.js';
+import { CalendarView } from './components/CalendarView.js';
 import { KanbanBoard } from './components/KanbanBoard.js';
 import { TableView } from './components/TableView.js';
 import { DetailDrawer } from './components/DetailDrawer.js';
@@ -28,17 +30,19 @@ import {
   Activity,
   Loader2,
   RefreshCw,
-  CheckCircle2
+  Calendar
 } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'prospects' | 'units'>('prospects');
+  const [activeTab, setActiveTab] = useState<'prospects' | 'units' | 'tours'>('prospects');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [preselectedTourProspect, setPreselectedTourProspect] = useState<Prospect | null>(null);
   
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -51,14 +55,16 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedProspects, fetchedUnits, fetchedTasks] = await Promise.all([
+      const [fetchedProspects, fetchedUnits, fetchedTasks, fetchedTours] = await Promise.all([
         fetchProspects(),
         fetchUnits(),
-        fetchTasks()
+        fetchTasks(),
+        fetchTours()
       ]);
       setProspects(fetchedProspects);
       setUnits(fetchedUnits);
       setTasks(fetchedTasks);
+      setTours(fetchedTours);
     } catch (err: any) {
       setError(err.message || 'Failed to load database records');
     } finally {
@@ -200,6 +206,17 @@ function App() {
             >
               <Home size={14} />
               Units Directory
+            </button>
+            <button
+              onClick={() => setActiveTab('tours')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                activeTab === 'tours'
+                  ? 'bg-slate-900 text-brand-400 border border-slate-800/80'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Calendar size={14} />
+              Tour Calendar
             </button>
           </nav>
 
@@ -356,7 +373,7 @@ function App() {
               )}
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'units' ? (
           <div className="flex-1 flex flex-col gap-4">
             <div>
               <h2 className="text-lg font-bold text-slate-100">Property Unit Directory</h2>
@@ -372,6 +389,15 @@ function App() {
               onDeleteUnit={handleDeleteUnit}
             />
           </div>
+        ) : (
+          <CalendarView
+            tours={tours}
+            prospects={prospects}
+            units={units}
+            onRefresh={loadData}
+            preselectedProspect={preselectedTourProspect}
+            onClearPreselectedProspect={() => setPreselectedTourProspect(null)}
+          />
         )}
       </main>
 
@@ -386,6 +412,12 @@ function App() {
         }}
         onUpdate={handleUpdateProspect}
         onDelete={handleDeleteProspect}
+        onUpdateTask={handleUpdateTask}
+        onScheduleTour={(prospect) => {
+          setPreselectedTourProspect(prospect);
+          setActiveTab('tours');
+          setIsDrawerOpen(false);
+        }}
       />
 
       {/* modal window for creating prospect */}
