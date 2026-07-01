@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Prospect, ProspectStatus, StatusHistory, Unit, Agent, Tour, UpdateProspectInput, UpdateProspectSchema } from 'shared';
+import { Prospect, ProspectStatus, StatusHistory, Unit, Tour, UpdateProspectInput, UpdateProspectSchema } from 'shared';
 import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2, Plus, Clock, Building } from 'lucide-react';
 
 interface DetailDrawerProps {
   prospect: Prospect | null;
   units: Unit[];
-  agents: Agent[];
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (id: string, updatedData: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onUpdateTask: (id: string, isCompleted: boolean, agentId?: string | null) => Promise<void>;
+  onUpdateTask: (id: string, isCompleted: boolean) => Promise<void>;
   onScheduleTour?: (prospect: Prospect) => void;
 }
 
@@ -29,7 +28,6 @@ const statusSteps: { value: ProspectStatus; label: string }[] = [
 export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   prospect,
   units,
-  agents,
   isOpen,
   onClose,
   onUpdate,
@@ -50,8 +48,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
       phone: '',
       status: 'new',
       notes: '',
-      assignedUnitId: '',
-      agentId: ''
+      assignedUnitId: ''
     }
   });
 
@@ -66,8 +63,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         phone: prospect.phone,
         status: prospect.status,
         notes: prospect.notes || '',
-        assignedUnitId: prospect.assignedUnitId || '',
-        agentId: prospect.agentId || ''
+        assignedUnitId: prospect.assignedUnitId || ''
       });
       setShowDeleteConfirm(false);
     }
@@ -86,8 +82,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
     try {
       await onUpdate(prospect.id, {
         ...data,
-        assignedUnitId: data.assignedUnitId || null,
-        agentId: data.agentId || null
+        assignedUnitId: data.assignedUnitId || null
       });
       setIsSaving(false);
       onClose();
@@ -314,25 +309,6 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Agent Assignment */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-slate-400 font-medium">Assign Agent</label>
-                <div className="relative">
-                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <select
-                    {...register('agentId')}
-                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
-                  >
-                    <option value="">Unassigned / No Agent</option>
-                    {agents.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               {/* Notes */}
               <div className="flex flex-col gap-1.5 flex-1 min-h-[120px]">
                 <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
@@ -363,23 +339,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-semibold ${task.isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}>{task.title}</p>
                       {task.description && <p className="text-xs text-slate-500 mt-1">{task.description}</p>}
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="text-xs font-medium text-slate-500">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
-                        <div className="flex items-center gap-1.5 flex-1 max-w-[150px]">
-                          <select
-                            value={task.agentId || ''}
-                            onChange={(e) => onUpdateTask(task.id, task.isCompleted, e.target.value || null)}
-                            className="w-full py-1 px-2 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[10px] focus:outline-none focus:border-brand-500 transition-all appearance-none cursor-pointer"
-                          >
-                            <option value="">Unassigned</option>
-                            {agents.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
+                      <div className="text-xs font-medium text-slate-500 mt-2">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
                     </div>
                   </div>
                 ))
@@ -522,7 +482,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   type="button"
                   onClick={handleSubmit(handleSave)}
                   disabled={isSaving}
-                  className="flex items-center gap-1.5 px-4.5 py-2 text-xs font-semibold bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 text-white rounded-xl shadow-lg shadow-brand-500/15 transition-all active:scale-[0.98]"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 text-white rounded-xl shadow-lg shadow-brand-500/15 transition-all active:scale-[0.98]"
                 >
                   <Save size={14} />
                   Save Changes

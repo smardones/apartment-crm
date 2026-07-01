@@ -35,11 +35,12 @@ export function filterProspects(prospects: Prospect[], options: FilterOptions): 
       const nameMatch = p.name.toLowerCase().includes(q);
       const emailMatch = p.email.toLowerCase().includes(q);
       const phoneMatch = p.phone.includes(q);
+      const agentMatch = p.agent?.name.toLowerCase().includes(q);
       const unitMatch = p.assignedUnit
         ? p.assignedUnit.number.toLowerCase().includes(q)
         : false;
 
-      if (!nameMatch && !emailMatch && !phoneMatch && !unitMatch) {
+      if (!nameMatch && !emailMatch && !phoneMatch && !unitMatch && !agentMatch) {
         return false;
       }
     }
