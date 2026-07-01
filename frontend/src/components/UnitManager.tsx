@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Unit, CreateUnitInput, UNIT_STATUSES } from 'shared';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Unit, CreateUnitInput, UNIT_STATUSES, CreateUnitSchema } from 'shared';
 import { Home, BedDouble, Bath, DollarSign, Plus, Trash2, Users } from 'lucide-react';
 
 interface UnitManagerProps {
@@ -19,34 +21,32 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
   onCreateUnit,
   onDeleteUnit
 }) => {
-  const [number, setNumber] = useState('');
-  const [rent, setRent] = useState(1200);
-  const [bedrooms, setBedrooms] = useState(1);
-  const [bathrooms, setBathrooms] = useState(1);
-  const [status, setStatus] = useState<any>('available');
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm<CreateUnitInput>({
+    resolver: zodResolver(CreateUnitSchema) as any,
+    defaultValues: {
+      number: '',
+      rent: 1200,
+      bedrooms: 1,
+      bathrooms: 1,
+      status: 'available'
+    }
+  });
+
+  const onSubmit = async (data: CreateUnitInput) => {
     setErrorMessage('');
     setIsSubmitting(true);
 
     try {
-      await onCreateUnit({
-        number,
-        rent: Number(rent),
-        bedrooms: Number(bedrooms),
-        bathrooms: Number(bathrooms),
-        status
-      });
-      // Reset form
-      setNumber('');
-      setRent(1200);
-      setBedrooms(1);
-      setBathrooms(1);
-      setStatus('available');
+      await onCreateUnit(data);
+      reset();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create unit');
     } finally {
@@ -71,7 +71,7 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
           {/* Unit Number */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-slate-400 font-medium">Unit Number</label>
@@ -79,13 +79,12 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
               <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
-                required
                 placeholder="e.g. 101, 204B"
-                value={number}
-                onChange={(e) => setNumber(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                {...register('number')}
+                className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.number ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
               />
             </div>
+            {errors.number && <span className="text-xs text-rose-500 font-medium">{errors.number.message}</span>}
           </div>
 
           {/* Monthly Rent */}
@@ -95,13 +94,12 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
               <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="number"
-                required
                 min={1}
-                value={rent}
-                onChange={(e) => setRent(Number(e.target.value))}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                {...register('rent', { valueAsNumber: true })}
+                className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.rent ? 'border-rose-500' : 'border-slate-800'} text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm`}
               />
             </div>
+            {errors.rent && <span className="text-xs text-rose-500 font-medium">{errors.rent.message}</span>}
           </div>
 
           {/* Bedrooms / Bathrooms */}
@@ -112,14 +110,13 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
                 <BedDouble size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="number"
-                  required
                   min={0}
-                  value={bedrooms}
-                  onChange={(e) => setBedrooms(Number(e.target.value))}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                  {...register('bedrooms', { valueAsNumber: true })}
+                  className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.bedrooms ? 'border-rose-500' : 'border-slate-800'} text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                   title="0 for Studio"
                 />
               </div>
+              {errors.bedrooms && <span className="text-xs text-rose-500 font-medium">{errors.bedrooms.message}</span>}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -128,14 +125,13 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
                 <Bath size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="number"
-                  required
                   min={0.5}
                   step={0.5}
-                  value={bathrooms}
-                  onChange={(e) => setBathrooms(Number(e.target.value))}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                  {...register('bathrooms', { valueAsNumber: true })}
+                  className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.bathrooms ? 'border-rose-500' : 'border-slate-800'} text-slate-200 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                 />
               </div>
+              {errors.bathrooms && <span className="text-xs text-rose-500 font-medium">{errors.bathrooms.message}</span>}
             </div>
           </div>
 
@@ -143,9 +139,8 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-slate-400 font-medium">Availability Status</label>
             <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm cursor-pointer"
+              {...register('status')}
+              className={`w-full px-3 py-2 rounded-xl bg-slate-950 border ${errors.status ? 'border-rose-500' : 'border-slate-800'} text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm cursor-pointer`}
             >
               {UNIT_STATUSES.map((statusVal) => (
                 <option key={statusVal} value={statusVal}>
@@ -153,6 +148,7 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
                 </option>
               ))}
             </select>
+            {errors.status && <span className="text-xs text-rose-500 font-medium">{errors.status.message}</span>}
           </div>
 
           <button

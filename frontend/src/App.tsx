@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput, Tour, Task } from 'shared';
+import { useState, useEffect, useMemo } from 'react';
+import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput, Tour, Task, PROSPECT_STATUSES, Agent } from 'shared';
 import {
   fetchUnits,
   createUnit,
@@ -10,7 +10,8 @@ import {
   deleteProspect,
   fetchTasks,
   updateTask,
-  fetchTours
+  fetchTours,
+  fetchAgents
 } from './api.js';
 import { CalendarView } from './components/CalendarView.js';
 import { KanbanBoard } from './components/KanbanBoard.js';
@@ -30,9 +31,25 @@ import {
   Activity,
   Loader2,
   RefreshCw,
-  Calendar
+  Calendar,
+  Search,
+  Filter
 } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
+import { filterProspects } from './services/filterService.js';
+import { Toast } from './components/Toast.js';
+
+
+const statusLabels: Record<ProspectStatus, string> = {
+  new: 'New Lead',
+  contacted: 'Contacted',
+  tour_scheduled: 'Tour Scheduled',
+  toured: 'Toured',
+  application: 'Application',
+  leased: 'Leased',
+  lost: 'Lost'
+};
+
 
 function App() {
   const [activeTab, setActiveTab] = useState<'prospects' | 'units' | 'tours'>('prospects');
@@ -42,6 +59,7 @@ function App() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tours, setTours] = useState<Tour[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [preselectedTourProspect, setPreselectedTourProspect] = useState<Prospect | null>(null);
   
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -50,25 +68,50 @@ function App() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [unitFilter, setUnitFilter] = useState<string>('all');
+
+  const filteredProspects = useMemo(() => {
+    return filterProspects(prospects, { searchQuery, statusFilter, unitFilter });
+  }, [prospects, searchQuery, statusFilter, unitFilter]);
+
 
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedProspects, fetchedUnits, fetchedTasks, fetchedTours] = await Promise.all([
+      const [fetchedProspects, fetchedUnits, fetchedTasks, fetchedTours, fetchedAgents] = await Promise.all([
         fetchProspects(),
         fetchUnits(),
         fetchTasks(),
-        fetchTours()
+        fetchTours(),
+        fetchAgents()
       ]);
       setProspects(fetchedProspects);
       setUnits(fetchedUnits);
       setTasks(fetchedTasks);
       setTours(fetchedTours);
+      setAgents(fetchedAgents);
     } catch (err: any) {
       setError(err.message || 'Failed to load database records');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const reloadTasks = async () => {
+    try {
+      const fetchedTasks = await fetchTasks();
+      setTasks(fetchedTasks);
+    } catch (err: any) {
+      console.error('Failed to reload tasks:', err);
     }
   };
 
@@ -78,64 +121,74 @@ function App() {
 
   const handleCreateProspect = async (data: CreateProspectInput) => {
     try {
-      await createProspect(data);
-      await loadData();
+      const newProspect = await createProspect(data);
+      setProspects(prev => [...prev, newProspect]);
+      showToast('Prospect created successfully', 'success');
+      await reloadTasks();
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to create prospect');
+      showToast(err.message || 'Failed to create prospect', 'error');
     }
   };
 
   const handleUpdateProspect = async (id: string, data: any) => {
     try {
       const updated = await updateProspect(id, data);
-      await loadData();
+      setProspects(prev => prev.map(p => p.id === id ? updated : p));
       
       // Update selected prospect in case the drawer is still open
       if (selectedProspect && selectedProspect.id === id) {
         setSelectedProspect(updated);
       }
+      showToast('Prospect updated successfully', 'success');
+      await reloadTasks();
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to update prospect');
+      showToast(err.message || 'Failed to update prospect', 'error');
     }
   };
 
   const handleDeleteProspect = async (id: string) => {
     try {
       await deleteProspect(id);
-      await loadData();
+      setProspects(prev => prev.filter(p => p.id !== id));
       if (selectedProspect && selectedProspect.id === id) {
         setSelectedProspect(null);
         setIsDrawerOpen(false);
       }
+      showToast('Prospect deleted', 'success');
+      await reloadTasks();
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to delete prospect');
+      showToast(err.message || 'Failed to delete prospect', 'error');
     }
   };
 
   const handleQuickStatusChange = async (id: string, newStatus: ProspectStatus) => {
     try {
-      await updateProspect(id, { status: newStatus });
-      await loadData();
+      const updated = await updateProspect(id, { status: newStatus });
+      setProspects(prev => prev.map(p => p.id === id ? updated : p));
+      await reloadTasks();
     } catch (err: any) {
-      alert(err.message || 'Failed to update status');
+      showToast(err.message || 'Failed to update status', 'error');
     }
   };
 
-  const handleUpdateTask = async (id: string, isCompleted: boolean) => {
+  const handleUpdateTask = async (id: string, isCompleted: boolean, agentId?: string | null) => {
     try {
-      await updateTask(id, { isCompleted });
-      await loadData();
+      const updated = await updateTask(id, { isCompleted, agentId });
+      setTasks(prev => prev.map(t => t.id === id ? updated : t));
+      await reloadTasks();
     } catch (err: any) {
-      alert(err.message || 'Failed to update task');
+      showToast(err.message || 'Failed to update task', 'error');
     }
   };
 
   const handleCreateUnit = async (data: CreateUnitInput) => {
     try {
-      await createUnit(data);
-      await loadData();
+      const newUnit = await createUnit(data);
+      setUnits(prev => [...prev, newUnit]);
+      showToast('Unit created successfully', 'success');
+      await reloadTasks();
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to create apartment unit');
+      showToast(err.message || 'Failed to create apartment unit', 'error');
     }
   };
 
@@ -143,9 +196,11 @@ function App() {
     if (confirm('Are you sure you want to delete this unit? This will unassign any connected prospects.')) {
       try {
         await deleteUnit(id);
-        await loadData();
+        setUnits(prev => prev.filter(u => u.id !== id));
+        showToast('Unit deleted', 'success');
+        await reloadTasks();
       } catch (err: any) {
-        alert(err.message || 'Failed to delete unit');
+        showToast(err.message || 'Failed to delete unit', 'error');
       }
     }
   };
@@ -360,16 +415,68 @@ function App() {
               </div>
             </div>
 
+            {/* Search & Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search prospects by name, email, or unit..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/25 transition-all text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="pl-9 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="all">All Stages</option>
+                    {PROSPECT_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {statusLabels[status]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <Home className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                  <select
+                    value={unitFilter}
+                    onChange={(e) => setUnitFilter(e.target.value)}
+                    className="pl-9 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="all">All Units</option>
+                    <option value="unassigned">Unassigned</option>
+                    {units
+                      .map((u) => u.number)
+                      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                      .map((num) => (
+                        <option key={num} value={num}>
+                          Unit {num}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
             {/* Render Kanban or Table */}
             <div className="flex-1 min-h-0">
               {viewMode === 'kanban' ? (
                 <KanbanBoard
-                  prospects={prospects}
+                  prospects={filteredProspects}
                   onSelectProspect={handleSelectProspect}
                   onUpdateStatus={handleQuickStatusChange}
                 />
               ) : (
-                <TableView prospects={prospects} onSelectProspect={handleSelectProspect} />
+                <TableView prospects={filteredProspects} onSelectProspect={handleSelectProspect} />
               )}
             </div>
           </div>
@@ -405,6 +512,7 @@ function App() {
       <DetailDrawer
         prospect={selectedProspect}
         units={units}
+        agents={agents}
         isOpen={isDrawerOpen}
         onClose={() => {
           setIsDrawerOpen(false);
@@ -423,10 +531,19 @@ function App() {
       {/* modal window for creating prospect */}
       <ProspectModal
         units={units}
+        agents={agents}
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreateProspect={handleCreateProspect}
       />
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       </div>
     </div>
   );

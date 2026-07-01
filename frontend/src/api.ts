@@ -9,7 +9,8 @@ import {
   UpdateTaskInput,
   Tour,
   CreateTourInput,
-  UpdateTourInput
+  UpdateTourInput,
+  Agent
 } from 'shared';
 
 const API_BASE = '/api';
@@ -33,6 +34,11 @@ async function handleResponse(response: Response) {
 
 export async function fetchUnits(): Promise<Unit[]> {
   const res = await fetch(`${API_BASE}/units`);
+  return handleResponse(res);
+}
+
+export async function fetchAgents(): Promise<Agent[]> {
+  const res = await fetch(`${API_BASE}/agents`);
   return handleResponse(res);
 }
 

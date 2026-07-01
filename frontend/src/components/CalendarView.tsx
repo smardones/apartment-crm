@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Unit, Prospect, Tour } from 'shared';
 import {
   ChevronLeft,
@@ -34,6 +37,15 @@ const standardTimeSlots = (() => {
   return slots;
 })();
 
+const TourFormSchema = z.object({
+  prospectId: z.string().min(1, 'Prospect is required'),
+  unitId: z.string().optional(),
+  scheduledDate: z.string().min(1, 'Date is required'),
+  scheduledTime: z.string().min(1, 'Time is required'),
+});
+
+type TourFormValues = z.infer<typeof TourFormSchema>;
+
 export function CalendarView({
   tours,
   prospects,
@@ -47,13 +59,20 @@ export function CalendarView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOutcomeModalOpen, setIsOutcomeModalOpen] = useState(false);
 
-  // Form states for new/edit tour
-  const [prospectId, setProspectId] = useState('');
-  const [unitId, setUnitId] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('10:00');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<TourFormValues>({
+    resolver: zodResolver(TourFormSchema),
+    defaultValues: {
+      prospectId: '',
+      unitId: '',
+      scheduledDate: new Date().toISOString().split('T')[0],
+      scheduledTime: '10:00'
+    }
+  });
+
+  const watchScheduledTime = watch('scheduledTime');
 
   // Outcome selection state
   const [selectedOutcome, setSelectedOutcome] = useState('');
@@ -61,15 +80,16 @@ export function CalendarView({
   // Handle preselected prospect from prospect details view
   useEffect(() => {
     if (preselectedProspect) {
-      setProspectId(preselectedProspect.id);
-      if (preselectedProspect.assignedUnitId) {
-        setUnitId(preselectedProspect.assignedUnitId);
-      }
       const today = new Date().toISOString().split('T')[0];
-      setScheduledDate(today);
+      reset({
+        prospectId: preselectedProspect.id,
+        unitId: preselectedProspect.assignedUnitId || '',
+        scheduledDate: today,
+        scheduledTime: '10:00'
+      });
       setIsModalOpen(true);
     }
-  }, [preselectedProspect]);
+  }, [preselectedProspect, reset]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -106,31 +126,37 @@ export function CalendarView({
 
   const openScheduleModal = (date?: Date) => {
     setErrorMsg(null);
-    setProspectId('');
-    setUnitId('');
+    setSelectedTour(null);
+    let schedDate = new Date().toISOString().split('T')[0];
     if (date) {
       const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-      setScheduledDate(offsetDate.toISOString().split('T')[0]);
-    } else {
-      setScheduledDate(new Date().toISOString().split('T')[0]);
+      schedDate = offsetDate.toISOString().split('T')[0];
     }
-    setScheduledTime('10:00');
-    setSelectedTour(null);
+    reset({
+      prospectId: '',
+      unitId: '',
+      scheduledDate: schedDate,
+      scheduledTime: '10:00'
+    });
     setIsModalOpen(true);
   };
 
   const openEditModal = (tour: Tour) => {
     setErrorMsg(null);
     setSelectedTour(tour);
-    setProspectId(tour.prospectId);
-    setUnitId(tour.unitId || '');
+    
     const tourDate = new Date(tour.scheduledTime);
     const offsetDate = new Date(tourDate.getTime() - tourDate.getTimezoneOffset() * 60000);
-    setScheduledDate(offsetDate.toISOString().split('T')[0]);
-
+    const schedDate = offsetDate.toISOString().split('T')[0];
     const hrs = String(tourDate.getHours()).padStart(2, '0');
     const mins = String(tourDate.getMinutes()).padStart(2, '0');
-    setScheduledTime(`${hrs}:${mins}`);
+
+    reset({
+      prospectId: tour.prospectId,
+      unitId: tour.unitId || '',
+      scheduledDate: schedDate,
+      scheduledTime: `${hrs}:${mins}`
+    });
     setIsModalOpen(true);
   };
 
@@ -142,18 +168,12 @@ export function CalendarView({
     }
   };
 
-  const handleSaveTour = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prospectId || !scheduledDate || !scheduledTime) {
-      setErrorMsg('Prospect, Date, and Time are required.');
-      return;
-    }
-
+  const handleSaveTour = async (data: TourFormValues) => {
     setIsSubmitting(true);
     setErrorMsg(null);
 
     // Combine date and time to ISO string
-    const dateStr = `${scheduledDate}T${scheduledTime}:00`;
+    const dateStr = `${data.scheduledDate}T${data.scheduledTime}:00`;
     const localDate = new Date(dateStr);
     if (isNaN(localDate.getTime())) {
       setErrorMsg('Invalid date/time format.');
@@ -162,8 +182,8 @@ export function CalendarView({
     }
 
     const payload = {
-      prospectId,
-      unitId: unitId || null,
+      prospectId: data.prospectId,
+      unitId: data.unitId || null,
       scheduledTime: localDate.toISOString(),
       status: 'scheduled' as const
     };
@@ -172,16 +192,14 @@ export function CalendarView({
       if (selectedTour) {
         await updateTour(selectedTour.id, payload);
       } else {
-        if (!unitId) {
+        if (!data.unitId) {
           setErrorMsg('A unit is required to schedule a new tour.');
           setIsSubmitting(false);
           return;
         }
         await createTour({
-          prospectId,
-          unitId,
-          scheduledTime: localDate.toISOString(),
-          status: 'scheduled'
+          ...payload,
+          unitId: data.unitId
         });
       }
       await onRefresh();
@@ -236,7 +254,7 @@ export function CalendarView({
         <div>
           <h2 className="text-lg font-bold text-slate-100">Tour Calendar</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tours are scheduled as fixed 1-hour slots. Overlapping bookings for units or prospects are blocked.
+            Tours are scheduled as fixed 1-hour slots.
           </p>
         </div>
 
@@ -400,7 +418,7 @@ export function CalendarView({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveTour} className="p-5 flex flex-col gap-4 overflow-y-auto">
+            <form onSubmit={handleSubmit(handleSaveTour)} noValidate className="p-5 flex flex-col gap-4 overflow-y-auto">
               {errorMsg && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-2">
                   <AlertTriangle size={14} className="shrink-0" />
@@ -419,24 +437,27 @@ export function CalendarView({
                     <span>{selectedTour.prospect?.name} ({selectedTour.prospect?.email})</span>
                   </div>
                 ) : (
-                  <select
-                    value={prospectId}
-                    onChange={(e) => {
-                      setProspectId(e.target.value);
-                      const selected = prospects.find((p) => p.id === e.target.value);
-                      if (selected?.assignedUnitId) {
-                        setUnitId(selected.assignedUnitId);
-                      }
-                    }}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer"
-                  >
-                    <option value="">-- Choose a Prospect --</option>
-                    {activeProspects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (Status: {p.status})
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      {...register('prospectId')}
+                      onChange={(e) => {
+                        setValue('prospectId', e.target.value, { shouldValidate: true });
+                        const selected = prospects.find((p) => p.id === e.target.value);
+                        if (selected?.assignedUnitId) {
+                          setValue('unitId', selected.assignedUnitId, { shouldValidate: true });
+                        }
+                      }}
+                      className={`bg-slate-950 border ${errors.prospectId ? 'border-rose-500' : 'border-slate-800'} rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer`}
+                    >
+                      <option value="">-- Choose a Prospect --</option>
+                      {activeProspects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Status: {p.status})
+                        </option>
+                      ))}
+                    </select>
+                    {errors.prospectId && <span className="text-xs text-rose-500 font-medium">{errors.prospectId.message}</span>}
+                  </>
                 )}
               </div>
 
@@ -451,8 +472,7 @@ export function CalendarView({
                   )}
                 </div>
                 <select
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
+                  {...register('unitId')}
                   className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer"
                 >
                   <option value="">
@@ -470,6 +490,7 @@ export function CalendarView({
                     <span>This tour was unassigned because the original unit was held/leased.</span>
                   </div>
                 )}
+                {errors.unitId && <span className="text-xs text-rose-500 font-medium">{errors.unitId.message}</span>}
               </div>
 
               {/* Date & Time */}
@@ -480,12 +501,11 @@ export function CalendarView({
                   </label>
                   <input
                     type="date"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
+                    {...register('scheduledDate')}
                     min={new Date().toISOString().split('T')[0]}
-                    required
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500"
+                    className={`bg-slate-950 border ${errors.scheduledDate ? 'border-rose-500' : 'border-slate-800'} rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500`}
                   />
+                  {errors.scheduledDate && <span className="text-xs text-rose-500 font-medium">{errors.scheduledDate.message}</span>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -493,15 +513,13 @@ export function CalendarView({
                     Time (Start)
                   </label>
                   <select
-                    value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
-                    required
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer"
+                    {...register('scheduledTime')}
+                    className={`bg-slate-950 border ${errors.scheduledTime ? 'border-rose-500' : 'border-slate-800'} rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer`}
                   >
                     {(() => {
                       const slots = [...standardTimeSlots];
-                      if (scheduledTime && !slots.includes(scheduledTime)) {
-                        slots.push(scheduledTime);
+                      if (watchScheduledTime && !slots.includes(watchScheduledTime)) {
+                        slots.push(watchScheduledTime);
                         slots.sort();
                       }
                       return slots.map((time) => {
@@ -518,6 +536,7 @@ export function CalendarView({
                       });
                     })()}
                   </select>
+                  {errors.scheduledTime && <span className="text-xs text-rose-500 font-medium">{errors.scheduledTime.message}</span>}
                 </div>
               </div>
 
@@ -602,7 +621,7 @@ export function CalendarView({
 
             <div className="p-5 flex flex-col gap-4">
               <p className="text-xs text-slate-400 font-medium">
-                Log the outcome for <strong className="text-slate-200">{selectedTour.prospect?.name}</strong>'s tour of <strong className="text-slate-200">{selectedTour.unit ? `Unit ${selectedTour.unit.number}` : 'unassigned unit'}</strong>. This will automatically update their pipeline status and trigger automation tasks.
+                Log the outcome for <strong className="text-slate-200">{selectedTour.prospect?.name}</strong>'s tour of <strong className="text-slate-200">{selectedTour.unit ? `Unit ${selectedTour.unit.number}` : 'unassigned unit'}</strong>.
               </p>
 
               <div className="flex flex-col gap-2">

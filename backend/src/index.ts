@@ -24,6 +24,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- AGENTS ROUTES ---
+
+app.get('/api/agents', async (req: Request, res: Response) => {
+  try {
+    const agents = await prisma.agent.findMany({
+      orderBy: { name: 'asc' }
+    });
+    res.json(agents);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve agents', details: error.message });
+  }
+});
+
 // --- UNITS ROUTES ---
 
 // Get all units
@@ -147,6 +160,7 @@ app.get('/api/prospects', async (req: Request, res: Response) => {
     const prospects = await prisma.prospect.findMany({
       include: {
         assignedUnit: true,
+        agent: true,
         tasks: { orderBy: { dueDate: 'asc' } },
         statusHistory: { orderBy: { createdAt: 'desc' } },
         tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
@@ -169,6 +183,7 @@ app.get('/api/prospects/:id', async (req: Request, res: Response) => {
       where: { id },
       include: {
         assignedUnit: true,
+        agent: true,
         tasks: { orderBy: { dueDate: 'asc' } },
         statusHistory: { orderBy: { createdAt: 'desc' } },
         tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
@@ -193,7 +208,7 @@ app.post('/api/prospects', async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, email, phone, status, notes, assignedUnitId } = parsed.data;
+    const { name, email, phone, status, notes, assignedUnitId, agentId } = parsed.data;
 
     // Check if unit exists if assignedUnitId is provided
     if (assignedUnitId) {
@@ -211,10 +226,12 @@ app.post('/api/prospects', async (req: Request, res: Response) => {
         phone,
         status,
         notes,
-        assignedUnitId: assignedUnitId || null
+        assignedUnitId: assignedUnitId || null,
+        agentId: agentId || null
       },
       include: {
-        assignedUnit: true
+        assignedUnit: true,
+        agent: true
       }
     });
 
@@ -273,7 +290,8 @@ app.put('/api/prospects/:id', async (req: Request, res: Response) => {
       where: { id },
       data: dataToUpdate as any,
       include: {
-        assignedUnit: true
+        assignedUnit: true,
+        agent: true
       }
     });
 
@@ -339,6 +357,7 @@ app.put('/api/prospects/:id', async (req: Request, res: Response) => {
       where: { id },
       include: {
         assignedUnit: true,
+        agent: true,
         tasks: { orderBy: { dueDate: 'asc' } },
         statusHistory: { orderBy: { createdAt: 'desc' } },
         tours: { include: { unit: true }, orderBy: { scheduledTime: 'asc' } }
@@ -390,7 +409,8 @@ app.get('/api/tasks', async (req: Request, res: Response) => {
       include: {
         prospect: {
           select: { name: true }
-        }
+        },
+        agent: true
       },
       orderBy: {
         dueDate: 'asc'
@@ -423,7 +443,10 @@ app.put('/api/tasks/:id', async (req: Request, res: Response) => {
 
     const task = await prisma.task.update({
       where: { id },
-      data: dataToUpdate
+      data: dataToUpdate,
+      include: {
+        agent: true
+      }
     });
     res.json(task);
   } catch (error: any) {

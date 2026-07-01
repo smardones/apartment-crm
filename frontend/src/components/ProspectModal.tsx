@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { CreateProspectInput, ProspectStatus, PROSPECT_STATUSES, Unit } from 'shared';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { CreateProspectInput, PROSPECT_STATUSES, Unit, Agent, CreateProspectSchema } from 'shared';
 import { X, User, Phone, Mail, Home, FileText, PlusCircle } from 'lucide-react';
 
 interface ProspectModalProps {
   units: Unit[];
+  agents: Agent[];
   isOpen: boolean;
   onClose: () => void;
   onCreateProspect: (data: CreateProspectInput) => Promise<void>;
@@ -11,43 +14,48 @@ interface ProspectModalProps {
 
 export const ProspectModal: React.FC<ProspectModalProps> = ({
   units,
+  agents,
   isOpen,
   onClose,
   onCreateProspect
 }) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<ProspectStatus>('new');
-  const [notes, setNotes] = useState('');
-  const [assignedUnitId, setAssignedUnitId] = useState('');
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm<CreateProspectInput>({
+    resolver: zodResolver(CreateProspectSchema) as any,
+    defaultValues: {
+      status: 'new',
+      notes: '',
+      assignedUnitId: '',
+      agentId: ''
+    }
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      reset();
+      setErrorMessage('');
+    }
+  }, [isOpen, reset]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: CreateProspectInput) => {
     setErrorMessage('');
     setIsSubmitting(true);
 
     try {
       await onCreateProspect({
-        name,
-        email,
-        phone,
-        status,
-        notes,
-        assignedUnitId: assignedUnitId || null
+        ...data,
+        assignedUnitId: data.assignedUnitId || null,
+        agentId: data.agentId || null
       });
-      // Clear form & close
-      setName('');
-      setEmail('');
-      setPhone('');
-      setStatus('new');
-      setNotes('');
-      setAssignedUnitId('');
       onClose();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create prospect');
@@ -73,7 +81,6 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold text-slate-200">Add New Prospect</h2>
-              <p className="text-xs text-slate-500">Record a new lead details into the sales pipeline.</p>
             </div>
           </div>
           <button
@@ -85,7 +92,7 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
           {errorMessage && (
             <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 font-semibold">
               {errorMessage}
@@ -99,13 +106,12 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
               <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
-                required
                 placeholder="e.g. John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                {...register('name')}
+                className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.name ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
               />
             </div>
+            {errors.name && <span className="text-xs text-rose-500 font-medium">{errors.name.message}</span>}
           </div>
 
           {/* Contact Details Grid */}
@@ -117,13 +123,12 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="email"
-                  required
                   placeholder="john.doe@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                  {...register('email')}
+                  className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.email ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                 />
               </div>
+              {errors.email && <span className="text-xs text-rose-500 font-medium">{errors.email.message}</span>}
             </div>
 
             {/* Phone */}
@@ -133,13 +138,12 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
                 <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
-                  required
                   placeholder="555-0199"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                  {...register('phone')}
+                  className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.phone ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                 />
               </div>
+              {errors.phone && <span className="text-xs text-rose-500 font-medium">{errors.phone.message}</span>}
             </div>
           </div>
 
@@ -149,9 +153,8 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-slate-400 font-medium">Pipeline Stage</label>
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as ProspectStatus)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm cursor-pointer"
+                {...register('status')}
+                className={`w-full px-3 py-2 rounded-xl bg-slate-950 border ${errors.status ? 'border-rose-500' : 'border-slate-800'} text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm cursor-pointer`}
               >
                 {PROSPECT_STATUSES.map((statusVal) => (
                   <option key={statusVal} value={statusVal}>
@@ -159,6 +162,7 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
                   </option>
                 ))}
               </select>
+              {errors.status && <span className="text-xs text-rose-500 font-medium">{errors.status.message}</span>}
             </div>
 
             {/* Unit Selection */}
@@ -167,14 +171,32 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
               <div className="relative">
                 <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <select
-                  value={assignedUnitId}
-                  onChange={(e) => setAssignedUnitId(e.target.value)}
+                  {...register('assignedUnitId')}
                   className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
                 >
                   <option value="">None (Keep Unassigned)</option>
                   {availableUnits.map((u) => (
                     <option key={u.id} value={u.id}>
                       Unit {u.number} (${u.rent.toLocaleString()}/mo)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Agent Assignment */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-slate-400 font-medium">Assign Agent</label>
+              <div className="relative">
+                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <select
+                  {...register('agentId')}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                >
+                  <option value="">Unassigned / No Agent</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
                     </option>
                   ))}
                 </select>
@@ -190,8 +212,7 @@ export const ProspectModal: React.FC<ProspectModalProps> = ({
             </label>
             <textarea
               placeholder="Add details about the lead's references, preferences, or notes..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              {...register('notes')}
               className="w-full h-24 p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm resize-none"
             />
           </div>

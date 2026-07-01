@@ -7,8 +7,24 @@ async function main() {
   await prisma.tour.deleteMany({});
   await prisma.prospect.deleteMany({});
   await prisma.unit.deleteMany({});
+  await prisma.agent.deleteMany({});
 
   console.log('Database cleaned.');
+
+  // Create Agents
+  const agent1 = await prisma.agent.create({
+    data: {
+      name: 'Sarah Conner',
+    }
+  });
+
+  const agent2 = await prisma.agent.create({
+    data: {
+      name: 'John Connor',
+    }
+  });
+
+  console.log('Created agents.');
 
   // Create Units
   const u101 = await prisma.unit.create({
@@ -81,7 +97,8 @@ async function main() {
       phone: '555-0192',
       status: 'new',
       notes: 'Interested in a 1 Bed 1 Bath, preferred move-in September.',
-      assignedUnitId: null
+      assignedUnitId: null,
+      agentId: agent1.id
     }
   });
 
@@ -92,7 +109,8 @@ async function main() {
       phone: '555-0143',
       status: 'contacted',
       notes: 'Sent initial pricing list. Prefers lower floors, parking space is a must.',
-      assignedUnitId: null
+      assignedUnitId: null,
+      agentId: agent2.id
     }
   });
 
@@ -103,7 +121,8 @@ async function main() {
       phone: '555-0177',
       status: 'tour_scheduled',
       notes: 'Tour scheduled for Wednesday at 2 PM. Showed interest in Unit 101.',
-      assignedUnitId: u101.id
+      assignedUnitId: u101.id,
+      agentId: agent1.id
     }
   });
 

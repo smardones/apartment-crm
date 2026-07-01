@@ -96,7 +96,8 @@ export class AutomationService {
             data: {
               prospectId,
               title,
-              dueDate
+              dueDate,
+              agentId: prospectData.agentId || null
             }
           });
           break;

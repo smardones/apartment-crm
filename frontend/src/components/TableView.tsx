@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Prospect, ProspectStatus, PROSPECT_STATUSES } from 'shared';
-import { Search, Filter, Home, ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { Prospect, ProspectStatus } from 'shared';
+import { Home, ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
 interface TableViewProps {
   prospects: Prospect[];
@@ -18,8 +18,6 @@ const statusBadges: Record<ProspectStatus, { label: string; bg: string; text: st
 };
 
 export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspect }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<'name' | 'status' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -32,24 +30,8 @@ export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspec
     }
   };
 
-  const filteredAndSorted = useMemo(() => {
+  const sorted = useMemo(() => {
     let result = [...prospects];
-
-    // Filter
-    if (statusFilter !== 'all') {
-      result = result.filter((p) => p.status === statusFilter);
-    }
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.email.toLowerCase().includes(q) ||
-          p.phone.includes(q) ||
-          (p.assignedUnit?.number || '').includes(q)
-      );
-    }
 
     // Sort
     result.sort((a, b) => {
@@ -66,42 +48,10 @@ export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspec
     });
 
     return result;
-  }, [prospects, searchQuery, statusFilter, sortField, sortDirection]);
+  }, [prospects, sortField, sortDirection]);
 
   return (
     <div className="flex flex-col h-full gap-4">
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-          <input
-            type="text"
-            placeholder="Search prospects by name, email, or unit..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/25 transition-all text-sm"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="pl-9 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
-            >
-              <option value="all">All Stages</option>
-              {PROSPECT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {statusBadges[status].label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Table Card */}
       <div className="flex-1 overflow-auto glass-panel border border-slate-800/80 rounded-2xl">
         <table className="w-full border-collapse text-left text-sm text-slate-300">
@@ -140,14 +90,14 @@ export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspec
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
-            {filteredAndSorted.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-slate-500">
                   No prospects found matching the search criteria.
                 </td>
               </tr>
             ) : (
-              filteredAndSorted.map((prospect) => {
+              sorted.map((prospect) => {
                 const badge = statusBadges[prospect.status];
                 return (
                   <tr

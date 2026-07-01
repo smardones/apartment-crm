@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { PROSPECT_STATUSES, UNIT_STATUSES, TOUR_STATUSES, TOUR_OUTCOMES } from './types.js';
 
+export const AgentSchema = z.object({
+  id: z.string(),
+  name: z.string()
+});
+
 export const CreateUnitSchema = z.object({
   number: z.string().min(1, 'Unit number is required'),
   status: z.enum(UNIT_STATUSES as [string, ...string[]]).default('available'),
@@ -18,7 +23,8 @@ export const CreateProspectSchema = z.object({
   status: z.enum(PROSPECT_STATUSES as [string, ...string[]]).default('new'),
   notes: z.string().default(''),
   assignedUnitId: z.string().nullable().optional(),
-  tourDate: z.string().nullable().optional()
+  tourDate: z.string().nullable().optional(),
+  agentId: z.string().nullable().optional()
 });
 
 export const UpdateProspectSchema = CreateProspectSchema.partial();
@@ -33,7 +39,8 @@ export const CreateTaskSchema = z.object({
   description: z.string().nullable().optional(),
   dueDate: z.string(),
   isCompleted: z.boolean().default(false),
-  prospectId: z.string().min(1, 'Prospect ID is required')
+  prospectId: z.string().min(1, 'Prospect ID is required'),
+  agentId: z.string().nullable().optional()
 });
 
 export const UpdateTaskSchema = CreateTaskSchema.partial().extend({

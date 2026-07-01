@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Prospect, ProspectStatus, StatusHistory, Unit, Tour } from 'shared';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Prospect, ProspectStatus, StatusHistory, Unit, Agent, Tour, UpdateProspectInput, UpdateProspectSchema } from 'shared';
 import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2, Plus, Clock, Building } from 'lucide-react';
 
 interface DetailDrawerProps {
   prospect: Prospect | null;
   units: Unit[];
+  agents: Agent[];
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (id: string, updatedData: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onUpdateTask: (id: string, isCompleted: boolean) => Promise<void>;
+  onUpdateTask: (id: string, isCompleted: boolean, agentId?: string | null) => Promise<void>;
   onScheduleTour?: (prospect: Prospect) => void;
 }
 
@@ -26,6 +29,7 @@ const statusSteps: { value: ProspectStatus; label: string }[] = [
 export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   prospect,
   units,
+  agents,
   isOpen,
   onClose,
   onUpdate,
@@ -34,44 +38,56 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   onScheduleTour
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'history' | 'tours'>('info');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<ProspectStatus>('new');
-  const [notes, setNotes] = useState('');
-  const [assignedUnitId, setAssignedUnitId] = useState<string>('');
-
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<UpdateProspectInput>({
+    resolver: zodResolver(UpdateProspectSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      status: 'new',
+      notes: '',
+      assignedUnitId: '',
+      agentId: ''
+    }
+  });
+
+  const currentStatus = watch('status');
+
   // Sync form states with prospect prop
   useEffect(() => {
-    console.log({ prospect })
     if (prospect) {
-      setName(prospect.name);
-      setEmail(prospect.email);
-      setPhone(prospect.phone);
-      setStatus(prospect.status);
-      setNotes(prospect.notes || '');
-      setAssignedUnitId(prospect.assignedUnitId || '');
+      reset({
+        name: prospect.name,
+        email: prospect.email,
+        phone: prospect.phone,
+        status: prospect.status,
+        notes: prospect.notes || '',
+        assignedUnitId: prospect.assignedUnitId || '',
+        agentId: prospect.agentId || ''
+      });
       setShowDeleteConfirm(false);
     }
-  }, [prospect]);
+  }, [prospect, reset]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveTab('info');
+    }
+  }, [isOpen]);
 
   if (!isOpen || !prospect) return null;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (data: UpdateProspectInput) => {
     setIsSaving(true);
     try {
       await onUpdate(prospect.id, {
-        name,
-        email,
-        phone,
-        status,
-        notes,
-        assignedUnitId: assignedUnitId || null
+        ...data,
+        assignedUnitId: data.assignedUnitId || null,
+        agentId: data.agentId || null
       });
       setIsSaving(false);
       onClose();
@@ -98,7 +114,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
     (u) => u.status === 'available' || u.status === 'held' || u.id === prospect.assignedUnitId
   );
 
-  const activeIndex = statusSteps.findIndex((step) => step.value === status);
+  const activeIndex = statusSteps.findIndex((step) => step.value === currentStatus);
 
   return (
     <>
@@ -127,11 +143,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         </div>
 
         {/* Form Container */}
-        <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-y-auto p-6 gap-6 min-h-0">
+        <form onSubmit={handleSubmit(handleSave)} noValidate className="flex-1 flex flex-col overflow-y-auto p-6 gap-6 min-h-0">
           {/* Stepper Pipeline Progress */}
           <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Pipeline Stage Progress
+              Prospect Status
             </h3>
 
             <div className="relative flex items-center justify-between">
@@ -163,7 +179,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   <button
                     key={step.value}
                     type="button"
-                    onClick={() => setStatus(step.value)}
+                    onClick={() => setValue('status', step.value, { shouldValidate: true })}
                     className="relative flex flex-col items-center gap-1.5 z-10 group"
                   >
                     <div
@@ -181,6 +197,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 );
               })}
             </div>
+            {errors.status && <span className="text-xs text-rose-500 font-medium block mt-2 text-center">{errors.status.message}</span>}
           </div>
 
           <div className="flex items-center gap-4 border-b border-slate-800 pb-2 mb-2">
@@ -235,12 +252,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                      {...register('name')}
+                      className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.name ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                     />
                   </div>
+                  {errors.name && <span className="text-xs text-rose-500 font-medium">{errors.name.message}</span>}
                 </div>
 
                 {/* Email */}
@@ -250,12 +266,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                      {...register('email')}
+                      className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.email ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                     />
                   </div>
+                  {errors.email && <span className="text-xs text-rose-500 font-medium">{errors.email.message}</span>}
                 </div>
 
                 {/* Phone */}
@@ -265,12 +280,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm"
+                      {...register('phone')}
+                      className={`w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border ${errors.phone ? 'border-rose-500' : 'border-slate-800'} text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm`}
                     />
                   </div>
+                  {errors.phone && <span className="text-xs text-rose-500 font-medium">{errors.phone.message}</span>}
                 </div>
               </div>
 
@@ -287,14 +301,32 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 <div className="relative">
                   <Home size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <select
-                    value={assignedUnitId}
-                    onChange={(e) => setAssignedUnitId(e.target.value)}
+                    {...register('assignedUnitId')}
                     className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
                   >
                     <option value="">Unassigned / No Unit Chosen</option>
                     {eligibleUnits.map((u) => (
                       <option key={u.id} value={u.id}>
                         Unit {u.number} ({u.bedrooms} Bed / {u.bathrooms} Bath) — {u.status.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Agent Assignment */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Assign Agent</label>
+                <div className="relative">
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <select
+                    {...register('agentId')}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="">Unassigned / No Agent</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
                       </option>
                     ))}
                   </select>
@@ -308,8 +340,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   Leasing Notes
                 </label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  {...register('notes')}
                   placeholder="Record inquiry details, tour reactions, screening progress or follow-up timelines..."
                   className="w-full flex-1 p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all text-sm resize-none"
                 />
@@ -332,7 +363,23 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-semibold ${task.isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}>{task.title}</p>
                       {task.description && <p className="text-xs text-slate-500 mt-1">{task.description}</p>}
-                      <div className="text-xs font-medium text-slate-500 mt-2">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="text-xs font-medium text-slate-500">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
+                        <div className="flex items-center gap-1.5 flex-1 max-w-[150px]">
+                          <select
+                            value={task.agentId || ''}
+                            onChange={(e) => onUpdateTask(task.id, task.isCompleted, e.target.value || null)}
+                            className="w-full py-1 px-2 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[10px] focus:outline-none focus:border-brand-500 transition-all appearance-none cursor-pointer"
+                          >
+                            <option value="">Unassigned</option>
+                            {agents.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -384,7 +431,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     const tourDate = new Date(tour.scheduledTime);
                     const isCanceled = tour.status === 'canceled';
                     const isCompleted = tour.status === 'completed' || tour.status === 'no_show';
-                    
+
                     let badgeColor = 'bg-slate-950 text-slate-400 border-slate-800';
                     if (isCanceled) {
                       badgeColor = 'bg-rose-950/20 text-rose-400 border-rose-500/20 line-through';
@@ -470,9 +517,10 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 >
                   Cancel
                 </button>
+                {/* We trigger a remote form submit for the form using its handleSubmit wrapper via react-hook-form */}
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={handleSubmit(handleSave)}
                   disabled={isSaving}
                   className="flex items-center gap-1.5 px-4.5 py-2 text-xs font-semibold bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 text-white rounded-xl shadow-lg shadow-brand-500/15 transition-all active:scale-[0.98]"
                 >

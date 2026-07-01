@@ -11,10 +11,10 @@ interface GlobalSidebarProps {
 export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalSidebarProps) {
   // Sort tasks: Urgent tasks first, then by due date
   const sortedTasks = [...tasks].sort((a, b) => {
-    const aUrgent = a.title === 'Urgent: Reassign Unit for Tour';
-    const bUrgent = b.title === 'Urgent: Reassign Unit for Tour';
-    if (aUrgent && !bUrgent) return -1;
-    if (!aUrgent && bUrgent) return 1;
+    const aIsUrgent = a.title.includes('Urgent');
+    const bIsUrgent = b.title.includes('Urgent');
+    if (aIsUrgent && !bIsUrgent) return -1;
+    if (!aIsUrgent && bIsUrgent) return 1;
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });
 
@@ -42,23 +42,21 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
           </div>
         ) : (
           openTasks.map((task) => {
-            const isUrgent = task.title === 'Urgent: Reassign Unit for Tour';
+            const isUrgent = task.title.includes('Urgent');
             const isOverdue = new Date(task.dueDate) < new Date() && !task.isCompleted;
             return (
               <div
                 key={task.id}
-                className={`group relative rounded-xl p-3 border transition-all shadow-sm ${
-                  isUrgent
-                    ? 'bg-rose-500/10 border-rose-500/40 hover:border-rose-500/80 shadow-rose-950/20'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                }`}
+                className={`group relative rounded-xl p-3 border transition-all shadow-sm ${isUrgent
+                  ? 'bg-rose-500/10 border-rose-500/40 hover:border-rose-500/80 shadow-rose-950/20'
+                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onUpdateTask(task.id, true)}
-                    className={`mt-0.5 transition-colors ${
-                      isUrgent ? 'text-rose-400 hover:text-rose-300' : 'text-slate-500 hover:text-brand-400'
-                    }`}
+                    className={`mt-0.5 transition-colors ${isUrgent ? 'text-rose-400 hover:text-rose-300' : 'text-slate-500 hover:text-brand-400'
+                      }`}
                   >
                     <Circle size={18} />
                   </button>
@@ -79,14 +77,17 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
                         {format(new Date(task.dueDate), 'MMM d, yyyy')}
                       </div>
                       {/* Navigate to prospect */}
-                      {(task as any).prospect && (
-                        <button
-                          onClick={() => onSelectProspect(task.prospectId)}
-                          className="text-xs text-brand-400 hover:text-brand-300 font-semibold truncate ml-2"
-                        >
-                          {(task as any).prospect.name}
-                        </button>
-                      )}
+                      <div>
+                        {(task as any).prospect && (
+                          <button
+                            onClick={() => onSelectProspect(task.prospectId)}
+                            className="text-xs text-brand-400 hover:text-brand-300 font-semibold truncate ml-2"
+                          >
+                            {(task as any).prospect.name}
+                          </button>
+                        )}
+                        {task.agent && <p className="text-xs text-slate-500 mt-1">Agent: {task.agent.name}</p>}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -9,10 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "shared": "*"
+    "react-hook-form": "^7.80.0",
+    "shared": "*",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

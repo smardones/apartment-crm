@@ -2,6 +2,10 @@ export type UnitStatus = 'available' | 'held' | 'leased';
 export declare const UNIT_STATUSES: UnitStatus[];
 export type ProspectStatus = 'new' | 'contacted' | 'tour_scheduled' | 'toured' | 'application' | 'leased' | 'lost';
 export declare const PROSPECT_STATUSES: ProspectStatus[];
+export interface Agent {
+    id: string;
+    name: string;
+}
 export interface Unit {
     id: string;
     number: string;
@@ -22,6 +26,8 @@ export interface Prospect {
     tourDate: string | null;
     createdAt: string;
     updatedAt: string;
+    agentId?: string | null;
+    agent?: Agent | null;
     tasks?: Task[];
     statusHistory?: StatusHistory[];
     tours?: Tour[];
@@ -58,6 +64,8 @@ export interface Task {
     isCompleted: boolean;
     completedAt: string | null;
     prospectId: string;
+    agentId?: string | null;
+    agent?: Agent | null;
     createdAt: string;
     updatedAt: string;
 }

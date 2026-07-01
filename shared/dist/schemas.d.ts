@@ -1,4 +1,14 @@
 import { z } from 'zod';
+export declare const AgentSchema: z.ZodObject<{
+    id: z.ZodString;
+    name: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    id: string;
+    name: string;
+}, {
+    id: string;
+    name: string;
+}>;
 export declare const CreateUnitSchema: z.ZodObject<{
     number: z.ZodString;
     status: z.ZodDefault<z.ZodEnum<[string, ...string[]]>>;
@@ -45,14 +55,16 @@ export declare const CreateProspectSchema: z.ZodObject<{
     notes: z.ZodDefault<z.ZodString>;
     assignedUnitId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     tourDate: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    agentId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
-    status: string;
     name: string;
+    status: string;
     email: string;
     phone: string;
     notes: string;
     assignedUnitId?: string | null | undefined;
     tourDate?: string | null | undefined;
+    agentId?: string | null | undefined;
 }, {
     name: string;
     email: string;
@@ -61,6 +73,7 @@ export declare const CreateProspectSchema: z.ZodObject<{
     notes?: string | undefined;
     assignedUnitId?: string | null | undefined;
     tourDate?: string | null | undefined;
+    agentId?: string | null | undefined;
 }>;
 export declare const UpdateProspectSchema: z.ZodObject<{
     name: z.ZodOptional<z.ZodString>;
@@ -70,22 +83,25 @@ export declare const UpdateProspectSchema: z.ZodObject<{
     notes: z.ZodOptional<z.ZodDefault<z.ZodString>>;
     assignedUnitId: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     tourDate: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+    agentId: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
 }, "strip", z.ZodTypeAny, {
-    status?: string | undefined;
     name?: string | undefined;
+    status?: string | undefined;
     email?: string | undefined;
     phone?: string | undefined;
     notes?: string | undefined;
     assignedUnitId?: string | null | undefined;
     tourDate?: string | null | undefined;
+    agentId?: string | null | undefined;
 }, {
-    status?: string | undefined;
     name?: string | undefined;
+    status?: string | undefined;
     email?: string | undefined;
     phone?: string | undefined;
     notes?: string | undefined;
     assignedUnitId?: string | null | undefined;
     tourDate?: string | null | undefined;
+    agentId?: string | null | undefined;
 }>;
 export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;
 export type UpdateUnitInput = z.infer<typeof UpdateUnitSchema>;
@@ -97,16 +113,19 @@ export declare const CreateTaskSchema: z.ZodObject<{
     dueDate: z.ZodString;
     isCompleted: z.ZodDefault<z.ZodBoolean>;
     prospectId: z.ZodString;
+    agentId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     title: string;
     dueDate: string;
     isCompleted: boolean;
     prospectId: string;
+    agentId?: string | null | undefined;
     description?: string | null | undefined;
 }, {
     title: string;
     dueDate: string;
     prospectId: string;
+    agentId?: string | null | undefined;
     description?: string | null | undefined;
     isCompleted?: boolean | undefined;
 }>;
@@ -116,9 +135,11 @@ export declare const UpdateTaskSchema: z.ZodObject<{
     dueDate: z.ZodOptional<z.ZodString>;
     isCompleted: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
     prospectId: z.ZodOptional<z.ZodString>;
+    agentId: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
 } & {
     completedAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
+    agentId?: string | null | undefined;
     title?: string | undefined;
     description?: string | null | undefined;
     dueDate?: string | undefined;
@@ -126,6 +147,7 @@ export declare const UpdateTaskSchema: z.ZodObject<{
     prospectId?: string | undefined;
     completedAt?: string | null | undefined;
 }, {
+    agentId?: string | null | undefined;
     title?: string | undefined;
     description?: string | null | undefined;
     dueDate?: string | undefined;

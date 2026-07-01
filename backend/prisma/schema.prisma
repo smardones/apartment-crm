@@ -18,6 +18,13 @@ model Unit {
   tours     Tour[]
 }
 
+model Agent {
+  id        String     @id @default(cuid())
+  name      String
+  prospects Prospect[]
+  tasks     Task[]
+}
+
 model Prospect {
   id             String   @id @default(cuid())
   name           String
@@ -30,6 +37,8 @@ model Prospect {
   tourDate       DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  agentId        String?
+  agent          Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
   tasks          Task[]
   statusHistory  StatusHistory[]
   tours          Tour[]
@@ -44,6 +53,8 @@ model Task {
   completedAt DateTime?
   prospectId  String
   prospect    Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  agentId     String?
+  agent       Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
