@@ -1,14 +1,10 @@
-import { Task } from 'shared';
 import { CheckCircle2, Circle, Clock, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAppContext } from '../context/AppContext.js';
 
-interface GlobalSidebarProps {
-  tasks: Task[];
-  onUpdateTask: (id: string, isCompleted: boolean) => void;
-  onSelectProspect: (prospectId: string) => void;
-}
+export function GlobalSidebar() {
+  const { tasks, handleUpdateTask, prospects, handleSelectProspect } = useAppContext();
 
-export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalSidebarProps) {
   // Sort tasks: Urgent tasks first, then by due date
   const sortedTasks = [...tasks].sort((a, b) => {
     const aIsUrgent = a.title.includes('Urgent');
@@ -54,7 +50,7 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
               >
                 <div className="flex items-start gap-3">
                   <button
-                    onClick={() => onUpdateTask(task.id, true)}
+                    onClick={() => handleUpdateTask(task.id, true)}
                     className={`mt-0.5 transition-colors ${isUrgent ? 'text-rose-400 hover:text-rose-300' : 'text-slate-500 hover:text-brand-400'
                       }`}
                   >
@@ -80,8 +76,11 @@ export function GlobalSidebar({ tasks, onUpdateTask, onSelectProspect }: GlobalS
                       <div>
                         {(task as any).prospect && (
                           <button
-                            onClick={() => onSelectProspect(task.prospectId)}
-                            className="text-xs text-brand-400 hover:text-brand-300 font-semibold truncate ml-2"
+                            onClick={() => {
+                              const p = prospects.find(pr => pr.id === task.prospectId);
+                              if (p) handleSelectProspect(p);
+                            }}
+                            className="text-xs text-brand-400 hover:text-brand-300 font-semibold truncate ml-2 max-w-[100px]"
                           >
                             {(task as any).prospect.name}
                           </button>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Unit, Prospect, Tour } from 'shared';
+import { Tour } from 'shared';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,16 +14,7 @@ import {
   CheckCircle2,
   Trash2
 } from 'lucide-react';
-import { createTour, updateTour, recordTourOutcome } from '../api.js';
-
-interface CalendarViewProps {
-  tours: Tour[];
-  prospects: Prospect[];
-  units: Unit[];
-  onRefresh: () => Promise<void>;
-  preselectedProspect?: Prospect | null;
-  onClearPreselectedProspect?: () => void;
-}
+import { useAppContext } from '../context/AppContext.js';
 
 const standardTimeSlots = (() => {
   const slots = [];
@@ -46,14 +37,18 @@ const TourFormSchema = z.object({
 
 type TourFormValues = z.infer<typeof TourFormSchema>;
 
-export function CalendarView({
-  tours,
-  prospects,
-  units,
-  onRefresh,
-  preselectedProspect,
-  onClearPreselectedProspect
-}: CalendarViewProps) {
+export function CalendarView() {
+  const {
+    tours,
+    prospects,
+    units,
+    preselectedTourProspect: preselectedProspect,
+    setPreselectedTourProspect,
+    handleCreateTour,
+    handleUpdateTour,
+    handleRecordTourOutcome
+  } = useAppContext();
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -163,9 +158,7 @@ export function CalendarView({
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedTour(null);
-    if (onClearPreselectedProspect) {
-      onClearPreselectedProspect();
-    }
+    setPreselectedTourProspect(null);
   };
 
   const handleSaveTour = async (data: TourFormValues) => {
@@ -190,19 +183,18 @@ export function CalendarView({
 
     try {
       if (selectedTour) {
-        await updateTour(selectedTour.id, payload);
+        await handleUpdateTour(selectedTour.id, payload);
       } else {
         if (!data.unitId) {
           setErrorMsg('A unit is required to schedule a new tour.');
           setIsSubmitting(false);
           return;
         }
-        await createTour({
+        await handleCreateTour({
           ...payload,
           unitId: data.unitId
         });
       }
-      await onRefresh();
       handleModalClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred while saving the tour.');
@@ -215,8 +207,7 @@ export function CalendarView({
     if (!selectedTour) return;
     if (confirm('Are you sure you want to cancel this tour?')) {
       try {
-        await updateTour(selectedTour.id, { status: 'canceled' });
-        await onRefresh();
+        await handleUpdateTour(selectedTour.id, { status: 'canceled' });
         handleModalClose();
       } catch (err: any) {
         alert(err.message || 'Failed to cancel tour');
@@ -233,8 +224,7 @@ export function CalendarView({
   const handleSaveOutcome = async () => {
     if (!selectedTour || !selectedOutcome) return;
     try {
-      await recordTourOutcome(selectedTour.id, selectedOutcome);
-      await onRefresh();
+      await handleRecordTourOutcome(selectedTour.id, selectedOutcome);
       setIsOutcomeModalOpen(false);
       setSelectedTour(null);
     } catch (err: any) {

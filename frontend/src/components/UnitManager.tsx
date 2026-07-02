@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Unit, CreateUnitInput, UNIT_STATUSES, CreateUnitSchema } from 'shared';
+import { CreateUnitInput, UNIT_STATUSES, CreateUnitSchema } from 'shared';
 import { Home, BedDouble, Bath, DollarSign, Plus, Trash2, Users } from 'lucide-react';
-
-interface UnitManagerProps {
-  units: Unit[];
-  onCreateUnit: (data: CreateUnitInput) => Promise<void>;
-  onDeleteUnit: (id: string) => Promise<void>;
-}
+import { useAppContext } from '../context/AppContext.js';
 
 const statusBadges: Record<string, { label: string; bg: string; text: string; border: string }> = {
   available: { label: 'Available', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
@@ -16,11 +11,8 @@ const statusBadges: Record<string, { label: string; bg: string; text: string; bo
   leased: { label: 'Leased', bg: 'bg-brand-500/10', text: 'text-brand-400', border: 'border-brand-500/20' }
 };
 
-export const UnitManager: React.FC<UnitManagerProps> = ({
-  units,
-  onCreateUnit,
-  onDeleteUnit
-}) => {
+export const UnitManager: React.FC = () => {
+  const { units, handleCreateUnit: onCreateUnit, handleDeleteUnit: onDeleteUnit } = useAppContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -54,6 +46,14 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
     }
   };
 
+  const handleConfirmDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this unit? This will unassign any connected prospects.')) {
+      onDeleteUnit(id).catch(err => {
+        alert(err.message || 'Failed to delete unit');
+      });
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Add Unit Sidebar Panel */}
@@ -66,7 +66,7 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
         </div>
 
         {errorMessage && (
-          <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 font-medium">
+          <div className="text-xs text-rose-405 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 font-medium">
             {errorMessage}
           </div>
         )}
@@ -232,7 +232,7 @@ export const UnitManager: React.FC<UnitManagerProps> = ({
 
                 <div className="pt-3 border-t border-slate-850 flex justify-end">
                   <button
-                    onClick={() => onDeleteUnit(unit.id)}
+                    onClick={() => handleConfirmDelete(unit.id)}
                     className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                     title="Remove Unit"
                   >

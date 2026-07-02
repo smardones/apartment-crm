@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Prospect, ProspectStatus, StatusHistory, Unit, Tour, UpdateProspectInput, UpdateProspectSchema } from 'shared';
+import { ProspectStatus, StatusHistory, Tour, UpdateProspectInput, UpdateProspectSchema } from 'shared';
 import { X, User, Phone, Mail, Home, Trash2, Save, FileText, CheckCircle2, Plus, Clock, Building } from 'lucide-react';
-
-interface DetailDrawerProps {
-  prospect: Prospect | null;
-  units: Unit[];
-  isOpen: boolean;
-  onClose: () => void;
-  onUpdate: (id: string, updatedData: any) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-  onUpdateTask: (id: string, isCompleted: boolean) => Promise<void>;
-  onScheduleTour?: (prospect: Prospect) => void;
-}
+import { useAppContext } from '../context/AppContext.js';
 
 const statusSteps: { value: ProspectStatus; label: string }[] = [
   { value: 'new', label: 'New' },
@@ -25,17 +15,27 @@ const statusSteps: { value: ProspectStatus; label: string }[] = [
   { value: 'lost', label: 'Lost' }
 ];
 
-export const DetailDrawer: React.FC<DetailDrawerProps> = ({
-  prospect,
-  units,
-  isOpen,
-  onClose,
-  onUpdate,
-  onDelete,
-  onUpdateTask,
-  onScheduleTour
-}) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'history' | 'tours'>('info');
+export const DetailDrawer: React.FC = () => {
+  const {
+    selectedProspect: prospect,
+    units,
+    agents,
+    isDrawerOpen: isOpen,
+    setIsDrawerOpen,
+    setSelectedProspect,
+    handleUpdateProspect: onUpdate,
+    handleDeleteProspect: onDelete,
+    handleUpdateTask: onUpdateTask,
+    setPreselectedTourProspect,
+    setActiveTab
+  } = useAppContext();
+
+  const onClose = () => {
+    setIsDrawerOpen(false);
+    setSelectedProspect(null);
+  };
+
+  const [activeTab, setActiveTabLocal] = useState<'info' | 'tasks' | 'history' | 'tours'>('info');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -48,7 +48,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
       phone: '',
       status: 'new',
       notes: '',
-      assignedUnitId: ''
+      assignedUnitId: '',
+      agentId: ''
     }
   });
 
@@ -63,7 +64,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         phone: prospect.phone,
         status: prospect.status,
         notes: prospect.notes || '',
-        assignedUnitId: prospect.assignedUnitId || ''
+        assignedUnitId: prospect.assignedUnitId || '',
+        agentId: prospect.agentId || ''
       });
       setShowDeleteConfirm(false);
     }
@@ -71,7 +73,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      setActiveTab('info');
+      setActiveTabLocal('info');
     }
   }, [isOpen]);
 
@@ -82,7 +84,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
     try {
       await onUpdate(prospect.id, {
         ...data,
-        assignedUnitId: data.assignedUnitId || null
+        assignedUnitId: data.assignedUnitId || null,
+        agentId: data.agentId || null
       });
       setIsSaving(false);
       onClose();
@@ -197,14 +200,14 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
           <div className="flex items-center gap-4 border-b border-slate-800 pb-2 mb-2">
             <button
               type="button"
-              onClick={() => setActiveTab('info')}
+              onClick={() => setActiveTabLocal('info')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${activeTab === 'info' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
               Info
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => setActiveTabLocal('tasks')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tasks' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
               Tasks
@@ -214,14 +217,14 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('history')}
+              onClick={() => setActiveTabLocal('history')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${activeTab === 'history' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
               History
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('tours')}
+              onClick={() => setActiveTabLocal('tours')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tours' ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
               Tours
@@ -308,6 +311,25 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 </div>
               </div>
 
+              {/* Agent Assignment */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Assign Agent</label>
+                <div className="relative">
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <select
+                    {...register('agentId')}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-none focus:border-brand-500 transition-all text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="">Unassigned / No Agent</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Notes */}
               <div className="flex flex-col gap-1.5 flex-1 min-h-[120px]">
                 <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
@@ -374,7 +396,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                 </h3>
                 <button
                   type="button"
-                  onClick={() => onScheduleTour && onScheduleTour(prospect)}
+                  onClick={() => {
+                    setPreselectedTourProspect(prospect);
+                    setActiveTab('tours');
+                    setIsDrawerOpen(false);
+                  }}
                   className="px-3 py-1 rounded-lg bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 text-brand-400 font-semibold text-[11px] transition-all flex items-center gap-1"
                 >
                   <Plus size={10} />

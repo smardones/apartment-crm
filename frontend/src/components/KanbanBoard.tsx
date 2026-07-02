@@ -1,12 +1,7 @@
 import React from 'react';
 import { Prospect, ProspectStatus, PROSPECT_STATUSES } from 'shared';
 import { Phone, Mail, ChevronLeft, ChevronRight, Home } from 'lucide-react';
-
-interface KanbanBoardProps {
-  prospects: Prospect[];
-  onSelectProspect: (prospect: Prospect) => void;
-  onUpdateStatus: (id: string, newStatus: ProspectStatus) => void;
-}
+import { useAppContext } from '../context/AppContext.js';
 
 const statusMetadata: Record<ProspectStatus, { label: string; color: string; bg: string; dot: string }> = {
   new: { label: 'New Lead', color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20', dot: 'bg-slate-400' },
@@ -18,11 +13,9 @@ const statusMetadata: Record<ProspectStatus, { label: string; color: string; bg:
   lost: { label: 'Lost', color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20', dot: 'bg-rose-400' }
 };
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({
-  prospects,
-  onSelectProspect,
-  onUpdateStatus
-}) => {
+export const KanbanBoard: React.FC = () => {
+  const { filteredProspects: prospects, handleSelectProspect, handleQuickStatusChange } = useAppContext();
+
   // Group prospects by status
   const grouped = PROSPECT_STATUSES.reduce((acc, status) => {
     acc[status] = prospects.filter((p) => p.status === status);
@@ -34,7 +27,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const currentIndex = PROSPECT_STATUSES.indexOf(prospect.status);
     let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
     if (newIndex >= 0 && newIndex < PROSPECT_STATUSES.length) {
-      onUpdateStatus(prospect.id, PROSPECT_STATUSES[newIndex]);
+      handleQuickStatusChange(prospect.id, PROSPECT_STATUSES[newIndex]);
     }
   };
 
@@ -75,7 +68,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   return (
                     <div
                       key={prospect.id}
-                      onClick={() => onSelectProspect(prospect)}
+                      onClick={() => handleSelectProspect(prospect)}
                       className={`glass-card hover:bg-slate-800/40 border border-slate-800/80 rounded-xl p-3.5 cursor-pointer transition-all duration-200 group flex flex-col justify-between ${
                         isHighIntent ? 'hover:border-brand-500/30' : 'hover:border-slate-700/50'
                       }`}

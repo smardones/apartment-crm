@@ -1,18 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Unit, Prospect, ProspectStatus, CreateProspectInput, CreateUnitInput, Tour, Task, PROSPECT_STATUSES, Agent } from 'shared';
-import {
-  fetchUnits,
-  createUnit,
-  deleteUnit,
-  fetchProspects,
-  createProspect,
-  updateProspect,
-  deleteProspect,
-  fetchTasks,
-  updateTask,
-  fetchTours,
-  fetchAgents
-} from './api.js';
+import { ProspectStatus, PROSPECT_STATUSES } from 'shared';
 import { CalendarView } from './components/CalendarView.js';
 import { KanbanBoard } from './components/KanbanBoard.js';
 import { TableView } from './components/TableView.js';
@@ -30,15 +16,13 @@ import {
   Building,
   Activity,
   Loader2,
-  RefreshCw,
   Calendar,
   Search,
   Filter
 } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
-import { filterProspects } from './services/filterService.js';
 import { Toast } from './components/Toast.js';
-
+import { useAppContext } from './context/AppContext.js';
 
 const statusLabels: Record<ProspectStatus, string> = {
   new: 'New Lead',
@@ -50,174 +34,30 @@ const statusLabels: Record<ProspectStatus, string> = {
   lost: 'Lost'
 };
 
-
 function App() {
-  const [activeTab, setActiveTab] = useState<'prospects' | 'units' | 'tours'>('prospects');
-  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
-
-  const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [tours, setTours] = useState<Tour[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [preselectedTourProspect, setPreselectedTourProspect] = useState<Prospect | null>(null);
-
-  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-  };
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [unitFilter, setUnitFilter] = useState<string>('all');
-
-  const filteredProspects = useMemo(() => {
-    return filterProspects(prospects, { searchQuery, statusFilter, unitFilter });
-  }, [prospects, searchQuery, statusFilter, unitFilter]);
-
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [fetchedProspects, fetchedUnits, fetchedTasks, fetchedTours, fetchedAgents] = await Promise.all([
-        fetchProspects(),
-        fetchUnits(),
-        fetchTasks(),
-        fetchTours(),
-        fetchAgents()
-      ]);
-      setProspects(fetchedProspects);
-      setUnits(fetchedUnits);
-      setTasks(fetchedTasks);
-      setTours(fetchedTours);
-      setAgents(fetchedAgents);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load database records');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const reloadTasks = async () => {
-    try {
-      const fetchedTasks = await fetchTasks();
-      setTasks(fetchedTasks);
-    } catch (err: any) {
-      console.error('Failed to reload tasks:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleCreateProspect = async (data: CreateProspectInput) => {
-    try {
-      const newProspect = await createProspect(data);
-      setProspects(prev => [...prev, newProspect]);
-      showToast('Prospect created successfully', 'success');
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to create prospect', 'error');
-    }
-  };
-
-  const handleUpdateProspect = async (id: string, data: any) => {
-    try {
-      const updated = await updateProspect(id, data);
-      setProspects(prev => prev.map(p => p.id === id ? updated : p));
-
-      // Update selected prospect in case the drawer is still open
-      if (selectedProspect && selectedProspect.id === id) {
-        setSelectedProspect(updated);
-      }
-      showToast('Prospect updated successfully', 'success');
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update prospect', 'error');
-    }
-  };
-
-  const handleDeleteProspect = async (id: string) => {
-    try {
-      await deleteProspect(id);
-      setProspects(prev => prev.filter(p => p.id !== id));
-      if (selectedProspect && selectedProspect.id === id) {
-        setSelectedProspect(null);
-        setIsDrawerOpen(false);
-      }
-      showToast('Prospect deleted', 'success');
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to delete prospect', 'error');
-    }
-  };
-
-  const handleQuickStatusChange = async (id: string, newStatus: ProspectStatus) => {
-    try {
-      const updated = await updateProspect(id, { status: newStatus });
-      setProspects(prev => prev.map(p => p.id === id ? updated : p));
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update status', 'error');
-    }
-  };
-
-  const handleUpdateTask = async (id: string, isCompleted: boolean, agentId?: string | null) => {
-    try {
-      const updated = await updateTask(id, { isCompleted, agentId });
-      setTasks(prev => prev.map(t => t.id === id ? updated : t));
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update task', 'error');
-    }
-  };
-
-  const handleCreateUnit = async (data: CreateUnitInput) => {
-    try {
-      const newUnit = await createUnit(data);
-      setUnits(prev => [...prev, newUnit]);
-      showToast('Unit created successfully', 'success');
-      await reloadTasks();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to create apartment unit', 'error');
-    }
-  };
-
-  const handleDeleteUnit = async (id: string) => {
-    if (confirm('Are you sure you want to delete this unit? This will unassign any connected prospects.')) {
-      try {
-        await deleteUnit(id);
-        setUnits(prev => prev.filter(u => u.id !== id));
-        showToast('Unit deleted', 'success');
-        await reloadTasks();
-      } catch (err: any) {
-        showToast(err.message || 'Failed to delete unit', 'error');
-      }
-    }
-  };
-
-  const handleSelectProspect = (prospect: Prospect) => {
-    setSelectedProspect(prospect);
-    setIsDrawerOpen(true);
-  };
-
-  // Compute metrics
-  const totalLeads = prospects.length;
-  const applicationCount = prospects.filter((p) => p.status === 'application').length;
-  const leasedCount = prospects.filter((p) => p.status === 'leased').length;
-
-  const totalUnits = units.length;
-  const occupiedUnits = units.filter((u) => u.status === 'leased').length;
-  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+  const {
+    activeTab,
+    setActiveTab,
+    viewMode,
+    setViewMode,
+    units,
+    isLoading,
+    error,
+    toast,
+    setToast,
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    setStatusFilter,
+    unitFilter,
+    setUnitFilter,
+    totalLeads,
+    applicationCount,
+    leasedCount,
+    occupancyRate,
+    loadData,
+    setIsCreateModalOpen
+  } = useAppContext();
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
@@ -271,26 +111,12 @@ function App() {
               Tour Calendar
             </button>
           </nav>
-
-          {/* Refresh Button */}
-          {/* <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-            title="Sync Database"
-          >
-            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-            <span>Sync</span>
-          </button> */}
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Global Sidebar for Tasks */}
-        <GlobalSidebar tasks={tasks} onUpdateTask={handleUpdateTask} onSelectProspect={(id) => {
-          const p = prospects.find(p => p.id === id);
-          if (p) handleSelectProspect(p);
-        }} />
+        <GlobalSidebar />
 
         {/* Main content */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
@@ -465,13 +291,9 @@ function App() {
               {/* Render Kanban or Table */}
               <div className="flex-1 min-h-0">
                 {viewMode === 'kanban' ? (
-                  <KanbanBoard
-                    prospects={filteredProspects}
-                    onSelectProspect={handleSelectProspect}
-                    onUpdateStatus={handleQuickStatusChange}
-                  />
+                  <KanbanBoard />
                 ) : (
-                  <TableView prospects={filteredProspects} onSelectProspect={handleSelectProspect} />
+                  <TableView />
                 )}
               </div>
             </div>
@@ -485,52 +307,18 @@ function App() {
               </div>
 
               {/* Render Unit Manager */}
-              <UnitManager
-                units={units}
-                onCreateUnit={handleCreateUnit}
-                onDeleteUnit={handleDeleteUnit}
-              />
+              <UnitManager />
             </div>
           ) : (
-            <CalendarView
-              tours={tours}
-              prospects={prospects}
-              units={units}
-              onRefresh={loadData}
-              preselectedProspect={preselectedTourProspect}
-              onClearPreselectedProspect={() => setPreselectedTourProspect(null)}
-            />
+            <CalendarView />
           )}
         </main>
 
         {/* sliding drawer panel for details */}
-        <DetailDrawer
-          prospect={selectedProspect}
-          units={units}
-          agents={agents}
-          isOpen={isDrawerOpen}
-          onClose={() => {
-            setIsDrawerOpen(false);
-            setSelectedProspect(null);
-          }}
-          onUpdate={handleUpdateProspect}
-          onDelete={handleDeleteProspect}
-          onUpdateTask={handleUpdateTask}
-          onScheduleTour={(prospect) => {
-            setPreselectedTourProspect(prospect);
-            setActiveTab('tours');
-            setIsDrawerOpen(false);
-          }}
-        />
+        <DetailDrawer />
 
         {/* modal window for creating prospect */}
-        <ProspectModal
-          units={units}
-          agents={agents}
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onCreateProspect={handleCreateProspect}
-        />
+        <ProspectModal />
 
         {toast && (
           <Toast

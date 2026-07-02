@@ -1,24 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateProspectInput, PROSPECT_STATUSES, Unit, Agent, CreateProspectSchema } from 'shared';
+import { CreateProspectInput, PROSPECT_STATUSES, CreateProspectSchema } from 'shared';
 import { X, User, Phone, Mail, Home, FileText, PlusCircle } from 'lucide-react';
+import { useAppContext } from '../context/AppContext.js';
 
-interface ProspectModalProps {
-  units: Unit[];
-  agents: Agent[];
-  isOpen: boolean;
-  onClose: () => void;
-  onCreateProspect: (data: CreateProspectInput) => Promise<void>;
-}
+export const ProspectModal: React.FC = () => {
+  const {
+    units,
+    agents,
+    isCreateModalOpen: isOpen,
+    setIsCreateModalOpen,
+    handleCreateProspect: onCreateProspect
+  } = useAppContext();
 
-export const ProspectModal: React.FC<ProspectModalProps> = ({
-  units,
-  agents,
-  isOpen,
-  onClose,
-  onCreateProspect
-}) => {
+  const onClose = () => {
+    setIsCreateModalOpen(false);
+  };
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 

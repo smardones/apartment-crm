@@ -1,11 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Prospect, ProspectStatus } from 'shared';
+import { ProspectStatus } from 'shared';
 import { Home, ArrowUpDown, MoreHorizontal } from 'lucide-react';
-
-interface TableViewProps {
-  prospects: Prospect[];
-  onSelectProspect: (prospect: Prospect) => void;
-}
+import { useAppContext } from '../context/AppContext.js';
 
 const statusBadges: Record<ProspectStatus, { label: string; bg: string; text: string }> = {
   new: { label: 'New Lead', bg: 'bg-slate-500/10 border-slate-500/20', text: 'text-slate-400' },
@@ -17,7 +13,8 @@ const statusBadges: Record<ProspectStatus, { label: string; bg: string; text: st
   lost: { label: 'Lost', bg: 'bg-rose-500/10 border-rose-500/20', text: 'text-rose-400' }
 };
 
-export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspect }) => {
+export const TableView: React.FC = () => {
+  const { filteredProspects: prospects, handleSelectProspect } = useAppContext();
   const [sortField, setSortField] = useState<'name' | 'status' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -102,7 +99,7 @@ export const TableView: React.FC<TableViewProps> = ({ prospects, onSelectProspec
                 return (
                   <tr
                     key={prospect.id}
-                    onClick={() => onSelectProspect(prospect)}
+                    onClick={() => handleSelectProspect(prospect)}
                     className="hover:bg-slate-900/40 cursor-pointer transition-colors group"
                   >
                     <td className="py-4 px-4 font-medium text-slate-200 group-hover:text-brand-300 transition-colors">
