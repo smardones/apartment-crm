@@ -116,6 +116,8 @@ app.put('/api/units/:id', async (req: Request, res: Response) => {
         }
       });
 
+      console.log(`Found ${upcomingTours.length} upcoming tours for unit ${id}`);
+
       for (const tour of upcomingTours) {
         await prisma.tour.update({
           where: { id: tour.id },

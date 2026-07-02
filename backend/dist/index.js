@@ -95,6 +95,7 @@ app.put('/api/units/:id', async (req, res) => {
                     scheduledTime: { gt: new Date() }
                 }
             });
+            console.log(`Found ${upcomingTours.length} upcoming tours for unit ${id}`);
             for (const tour of upcomingTours) {
                 await prisma.tour.update({
                     where: { id: tour.id },

@@ -144,6 +144,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // Handles initial load
   useEffect(() => {
     loadData();
   }, []);
@@ -288,7 +289,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Compute metrics
+  // Compute metrics for dashboard
   const totalLeads = prospects.length;
   const applicationCount = prospects.filter((p) => p.status === 'application').length;
   const leasedCount = prospects.filter((p) => p.status === 'leased').length;
