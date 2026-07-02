@@ -13,6 +13,7 @@ import {
 import { AutomationService } from './automationService.js';
 
 const app = express();
+export default app;
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -710,6 +711,8 @@ app.post('/api/tours/:id/outcome', async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
